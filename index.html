@@ -4418,7 +4418,7 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
                 // Format wie bei den o2-Shops (ludocid + lrd) – oeffnet zuverlaessig
                 // das Google-Profil mit prominentem "Rezension schreiben"-Button.
                 reviewUrl:'https://www.google.com/search?hl=de-DE&gl=de&q=Telekom+Partner+Crailsheim,+Schillerstra%C3%9Fe+6,+74564+Crailsheim&ludocid=16798782424287144657&lsig=AB86z5VtqhztHf9y756Qd_cva-HP#lrd=0x4798f11ab2e0f8cd:0xe921439c72b5ead1,3'
-                // instagram:'https://www.instagram.com/...'  // sobald vorhanden hier eintragen
+                ,instagram:'https://www.instagram.com/telekompartnercrailsheim/'
             },
         };
         // Kurz-Codes für den Gutschein-Präfix (z.B. AAL, CR, SHA). Bei Bedarf
@@ -15112,10 +15112,9 @@ const makeOutroContent = () => {
           <div class="share-outro-h">Folgen & Sparen</div>
           <div class="share-outro-p">News, Aktionen und Deals<br/>direkt aus ${CURRENT_SHOP.ort}.</div>
           <div class="share-outro-qr">
-            <img crossorigin="anonymous" referrerpolicy="no-referrer" src="${qrUrl(instagramUrl,'bc1888')}" alt="QR Insta" />
+            <img crossorigin="anonymous" referrerpolicy="no-referrer" src="${qrUrl(instagramUrl, CURRENT_BRAND === 'o2' ? 'bc1888' : _SHARE_THEME.qr)}" alt="QR Insta" />
           </div>
           <div class="share-outro-link">${instagramHandle}</div>
-          <div class="share-outro-link">${instagramUrl}</div>
         </div>` : `
         <div class="share-outro-card">
           <div class="share-outro-icon">☎</div>
