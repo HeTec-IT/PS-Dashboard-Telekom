@@ -2121,10 +2121,13 @@ body.pdf-share-mode .share-page:last-child{
 /* ===== SHARE COVER/OUTRO STYLES (nur im Iframe Share-PDF) ===== */
 /* Farben kommen aus Variablen – werden je Marke gesetzt (o2 blau / Telekom-Partner magenta) */
 :root{
-  --SHARE_GRAD_1:#1e40af;
-  --SHARE_GRAD_2:#2563eb;
-  --SHARE_GRAD_3:#3b82f6;
-  --SHARE_CHIP:#003CA6;
+  /* Telekom-Partner-Farben als Standard. Die eigentliche Faerbung passiert
+     inline in makeCoverContent/makeOutroContent – das hier ist nur die
+     Rueckfallebene, damit nirgends o2-Blau durchschlaegt. */
+  --SHARE_GRAD_1:#E20074;
+  --SHARE_GRAD_2:#D6006E;
+  --SHARE_GRAD_3:#C40065;
+  --SHARE_CHIP:#A6005A;
 }
 .share-cover, .share-outro{
   width:100%;
@@ -2132,7 +2135,7 @@ body.pdf-share-mode .share-page:last-child{
   min-height:200px;
   border-radius:22px;
   padding:28px;
-  background: linear-gradient(135deg,var(--SHARE_GRAD_1) 0%,var(--SHARE_GRAD_2) 55%,var(--SHARE_GRAD_3) 100%);
+  background: linear-gradient(180deg,var(--SHARE_GRAD_1) 0%,var(--SHARE_GRAD_2) 55%,var(--SHARE_GRAD_3) 100%);
   color:#fff;
   overflow:hidden;
 }
@@ -2157,17 +2160,17 @@ body.pdf-share-mode .share-outro,
 }
 
 .share-outro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:1060px;margin:0 auto;flex:1 1 auto;min-height:0;align-content:stretch;}
-.share-outro-card{background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:20px;padding:14px;text-align:center;display:flex;flex-direction:column;justify-content:center;}
-.share-outro-card-focus{border-color:rgba(0,60,166,0.55);background:rgba(255,255,255,0.12);transform:scale(1.02);}
+.share-outro-card{background:rgba(0,0,0,0.13);border:1px solid rgba(255,255,255,0.28);border-radius:20px;padding:14px;text-align:center;display:flex;flex-direction:column;justify-content:center;}
+.share-outro-card-focus{border-color:rgba(255,255,255,0.75);background:rgba(0,0,0,0.22);transform:scale(1.02);}
 .share-outro-icon{width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;font-weight:1000;}
 .share-outro-h{font-size:18px;font-weight:1000;letter-spacing:-0.02em;}
-.share-outro-p{margin-top:8px;font-size:11px;color:rgba(255,255,255,0.80);line-height:1.35;}
-.share-outro-small{font-size:10px;color:rgba(255,255,255,0.70);font-weight:700;}
+.share-outro-p{margin-top:8px;font-size:11px;color:rgba(255,255,255,0.95);line-height:1.35;}
+.share-outro-small{font-size:10px;color:rgba(255,255,255,0.90);font-weight:700;}
 .share-outro-qr{margin:8px auto 6px auto;width:110px;height:110px;background:#fff;border-radius:14px;padding:8px;box-shadow:0 8px 20px rgba(0,0,0,0.25);}
 .share-outro-qr img{width:100%;height:100%;object-fit:contain;display:block;}
 .share-outro-link{font-size:9px;word-break:break-all;color:rgba(255,255,255,0.65);margin-top:6px;font-weight:800;}
 .share-outro-amount{margin-top:6px;font-size:44px;font-weight:1000;color:#ffffff;}
-.share-outro-voucher{margin-top:10px;padding:12px 10px;border:2px dashed rgba(255,255,255,0.35);border-radius:18px;font-family:monospace;font-size:16px;font-weight:1000;background:rgba(0,0,0,0.18);letter-spacing:0.12em;}
+.share-outro-voucher{margin-top:10px;padding:12px 10px;border:2px dashed rgba(255,255,255,0.65);border-radius:18px;font-family:monospace;font-size:16px;font-weight:1000;background:rgba(0,0,0,0.30);letter-spacing:0.12em;}
 /* ===== MANUELLER SHARE OFFSET (FINAL) ===== */
 :root{
   --SHARE_OFFSET_X: 0px; /* + = rechts | - = links */
@@ -4392,6 +4395,18 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
         const _gmapsSearch = (q) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
         const _qrFor = (url) => 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(url) + '&color=003CA6&bgcolor=ffffff&margin=1';
 
+        // ═══════════════════════════════════════════════════════════════
+        // 📕 AKTIONSMAPPE – vorerst AUSGEBLENDET (Telekom-Repo)
+        // ───────────────────────────────────────────────────────────────
+        // Die Telekom-Aktionsmappe ist noch nicht befüllt. Bis dahin sind
+        // alle Einstiege ausgeblendet, damit im Kundengespräch niemand auf
+        // einen leeren Bundle-Katalog klickt.
+        //
+        // ► ZUM AKTIVIEREN: einfach auf true setzen. Sonst nichts nötig –
+        //   Firebase-Config und Bundle-Import sind bereits fertig verdrahtet.
+        // ═══════════════════════════════════════════════════════════════
+        const AKTIONSMAPPE_AKTIV = false;
+
         const SHOPS = {
             // Dieses Repo ist AUSSCHLIESSLICH der Telekom-Partner-Shop.
             // Bewusst nur EIN Shop – es gibt hier keine o2-Filialen und
@@ -4400,7 +4415,9 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
                 id:'telekom-crailsheim', name:'HeTec Handytarifmakler', ort:'Crailsheim',
                 adresse:'Schillerstraße 6, 74564 Crailsheim', tel:'07951 - 296980',
                 brand:'telekom',
-                reviewUrl:'https://search.google.com/local/writereview?placeid=0x4798f11ab2e0f8cd:0xe921439c72b5ead1'
+                // Format wie bei den o2-Shops (ludocid + lrd) – oeffnet zuverlaessig
+                // das Google-Profil mit prominentem "Rezension schreiben"-Button.
+                reviewUrl:'https://www.google.com/search?hl=de-DE&gl=de&q=Telekom+Partner+Crailsheim,+Schillerstra%C3%9Fe+6,+74564+Crailsheim&ludocid=16798782424287144657&lsig=AB86z5VtqhztHf9y756Qd_cva-HP#lrd=0x4798f11ab2e0f8cd:0xe921439c72b5ead1,3'
                 // instagram:'https://www.instagram.com/...'  // sobald vorhanden hier eintragen
             },
         };
@@ -4437,13 +4454,14 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
         // ═══════════════════════════════════════════════════════════════
         const BRANDS = {
             o2:       { id:'o2',       label:'o2',       color:'#0019a5' },
-            // Bewusst NICHT das originale Telekom-Magenta (#E20074) – das ist
-            // markenrechtlich geschützt. Wir nutzen ein eigenes, dunkleres Beere-Magenta.
-            telekom:  { id:'telekom',  label:'Telekom',  color:'#A6216E' },
+            // Akzentfarbe in der App-Oberflaeche (Tabs, Badges). Die Farbe der
+            // KUNDENUNTERLAGE steht separat bei _TK_MAGENTA weiter unten.
+            telekom:  { id:'telekom',  label:'Telekom',  color:'#E20074' },
             vodafone: { id:'vodafone', label:'Vodafone', color:'#e60000' }
         };
         // Partner-Magenta an zentraler Stelle – wird für Deckblatt, Schlussseite und QR genutzt
-        const TELEKOM_PARTNER_MAGENTA = '#A6216E';
+        // Magenta fuer die App-Oberflaeche (MagentaTV-Tabs im Preisvergleich)
+        const TELEKOM_PARTNER_MAGENTA = '#E20074';
 
         // Dieses Repo ist fest Telekom – bewusst KEINE Umschaltung über ?brand=,
         // damit im Telekom-Shop unter keinen Umständen o2-Branding erscheinen kann.
@@ -7764,7 +7782,7 @@ const highResHTML = buildHighResBundleHTML(d);
                                 value={currentUrl}
                                 readOnly
                                 className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                placeholder="https://hetec-it.github.io/Aktionsmappen-Dashboard/?bundleId=hw-01"
+                                placeholder="https://hetec-it.github.io/Aktionsmappe-Telekom/?bundleId=..."
                             />
                         </div>
                     </div>
@@ -9299,7 +9317,7 @@ function buildMidpointPath(ctx, fp) {
             try { hardEndInteraction(); } catch(_) {}
         };
         const handleImageReset = () => { onUpdateImageTransform(statusKey, { x: 0, y: 0, scale: 0.8, rotation: 0 }); }; 
-        return (<div className={containerClasses} style={{transition: 'all 0.25s ease', ...(htmlOverlay && overlayBoxHeight ? { minHeight: (overlayBoxHeight + 130) + 'px' } : {})}}> <div className="p-4 bg-white/90 border-b border-slate-100 relative z-[60] shrink-0 flex flex-col"><div className="flex justify-between items-start"><div className="flex items-center gap-3 text-lg font-bold text-slate-800"><Icon d={icon} size={20} className="text-blue-600"/><span>{label}</span></div><div className="flex items-center gap-2 offer-toolbar-icons">{(statusKey === 'offer1' || statusKey === 'offer2' || statusKey === 'offer3') && typeof onOpenBundleModal === 'function' ? (<button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenBundleModal('customer', statusKey); }} className="p-1.5 rounded-full bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Bundle öffnen"><Icon d={ICONS.Smartphone} size={16}/></button>) : null}{typeof onSetPackagePrice === 'function' && (() => { const pd = packagePriceData||{}; const hp = pd.einmalig||pd.monatlich; return (<button type="button" onClick={(e)=>{e.preventDefault();e.stopPropagation();onSetPackagePrice(statusKey);}} style={{padding:'6px',borderRadius:'50%',background:hp?'#dcfce7':'#f8fafc',color:hp?'#16a34a':'#94a3b8',border:hp?'1.5px solid #86efac':'1.5px solid #e2e8f0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'11px',width:'28px',height:'28px'}} title="Paket-Preis setzen">€</button>); })()}{htmlOverlay && (x !== 0 || y !== 0 || scale !== 1.0 || rotation !== 0) && (<button onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); handleImageReset(); }} className="p-1.5 rounded-full bg-slate-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Position/Skalierung/Rotation zurücksetzen"><Icon d={ICONS.RefreshCw} size={14}/></button>)}
+        return (<div className={containerClasses} style={{transition: 'all 0.25s ease', ...(htmlOverlay && overlayBoxHeight ? { minHeight: (overlayBoxHeight + 130) + 'px' } : {})}}> <div className="p-4 bg-white/90 border-b border-slate-100 relative z-[60] shrink-0 flex flex-col"><div className="flex justify-between items-start"><div className="flex items-center gap-3 text-lg font-bold text-slate-800"><Icon d={icon} size={20} className="text-blue-600"/><span>{label}</span></div><div className="flex items-center gap-2 offer-toolbar-icons">{AKTIONSMAPPE_AKTIV && (statusKey === 'offer1' || statusKey === 'offer2' || statusKey === 'offer3') && typeof onOpenBundleModal === 'function' ? (<button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenBundleModal('customer', statusKey); }} className="p-1.5 rounded-full bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Bundle öffnen"><Icon d={ICONS.Smartphone} size={16}/></button>) : null}{typeof onSetPackagePrice === 'function' && (() => { const pd = packagePriceData||{}; const hp = pd.einmalig||pd.monatlich; return (<button type="button" onClick={(e)=>{e.preventDefault();e.stopPropagation();onSetPackagePrice(statusKey);}} style={{padding:'6px',borderRadius:'50%',background:hp?'#dcfce7':'#f8fafc',color:hp?'#16a34a':'#94a3b8',border:hp?'1.5px solid #86efac':'1.5px solid #e2e8f0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'11px',width:'28px',height:'28px'}} title="Paket-Preis setzen">€</button>); })()}{htmlOverlay && (x !== 0 || y !== 0 || scale !== 1.0 || rotation !== 0) && (<button onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); handleImageReset(); }} className="p-1.5 rounded-full bg-slate-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Position/Skalierung/Rotation zurücksetzen"><Icon d={ICONS.RefreshCw} size={14}/></button>)}
         {htmlOverlay && (statusKey === 'offer1' || statusKey === 'offer2' || statusKey === 'offer3') && (
             <>
                 <button type="button" onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); toggleOverlayEdit(); }} className={`p-1.5 rounded-full transition-colors ${overlayEditEnabled ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50'}`} title={overlayEditEnabled ? 'Bearbeiten aktiv: Angebot kann bewegt/skaliert werden (Zeichnen ist dann gesperrt). Klick zum Sperren.' : 'Bearbeiten aus: Zeichnen ist frei. Klick um Angebot zu bewegen/skaliert zu bearbeiten.'}><Icon d={ICONS.Lock} size={16}/></button>
@@ -10598,7 +10616,11 @@ const toolRef = useRef('pen');
 
             
 // ===== Bundle IFrame (extern) =====
-const BUNDLE_URL = "https://hetec-it.github.io/Aktionsmappen-Dashboard/"; // v53t: Umzug jefferson990 -> hetec-it
+// ⚠️ Telekom-Repo: hier später die URL der TELEKOM-Aktionsmappe eintragen.
+// Aktuell steht bewusst ein leerer Wert – die o2-Aktionsmappe darf hier
+// nicht auftauchen. Solange AKTIONSMAPPE_AKTIV = false ist, wird die URL
+// ohnehin nirgends geöffnet.
+const BUNDLE_URL = ""; // z.B. "https://hetec-it.github.io/Aktionsmappe-Telekom/"
 const [showBundleModal, setShowBundleModal] = useState(false);
 const [bundleModalUrl, setBundleModalUrl] = useState(BUNDLE_URL);
 const [bundleTargetKey, setBundleTargetKey] = useState('offer1');
@@ -10736,6 +10758,9 @@ const handleOpenStats = () => { setShowPinLock(true); };
 
             // ── Smart-Match: Firebase → passender Netzwerk-Bundle ──
             const smartMatchNetBundle = React.useCallback(async (wlanRec, techList) => {
+                // Aktionsmappe noch nicht befüllt → gar nicht erst suchen.
+                // Sonst käme im Kundengespräch die Meldung "kein Bundle hinterlegt".
+                if (!AKTIONSMAPPE_AKTIV) { setNetBundleMatched(null); return; }
                 const WLAN_SLOT_MAP = {
                     'Mesh':       'net-mesh',
                     'Powerline':  'net-powerline',
@@ -11152,7 +11177,7 @@ const fileInputRef = useRef(null);
             const translatedTextLiveRef = useRef({});
             const [staticTranslations, setStaticTranslations] = useState({}); 
             const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-            const [oneDriveLink, setOneDriveLink] = useState('https://hetec-it.github.io/Aktionsmappen-Dashboard/'); 
+            const [oneDriveLink, setOneDriveLink] = useState(''); // Telekom-Repo: leer, bis die Telekom-Aktionsmappe existiert 
 
 
             const [isDrawing, setIsDrawing] = useState(false);
@@ -12285,7 +12310,7 @@ const ensureRufnummerBeforePdf = async () => {
         const _type = customerSignature ? 'abschluss' : 'angebot';
         const _agent = (() => { try { const a = getAgentDisplayNameForUpload(); return a === '–' ? '' : a; } catch(e) { return ''; } })();
         const _datum = new Date().toISOString().slice(0,10);
-        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true });
+        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true, archivKurz: true });
         await parkArchiveEntry({
             id: 'park_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
             ts: Date.now(), type: _type, agent: _agent, datum: _datum,
@@ -12730,7 +12755,7 @@ const handleFinishOfferClick = () => {
                                     try {
                                         const _datum = new Date().toISOString().slice(0,10);
                                         const _agent = (() => { try { const a = getAgentDisplayNameForUpload(); return a === '–' ? '' : a; } catch(e){ return ''; } })();
-                                        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true });
+                                        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true, archivKurz: true });
                                         await parkArchiveEntry({
                                             id: 'park_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
                                             ts: Date.now(), type: 'abschluss', agent: _agent, datum: _datum,
@@ -14174,6 +14199,18 @@ const renderStrokesForPrint = (strokes, targetW, targetH, key) => {
 const createPrintLookPdfBlob = async (triggerToast, ensurePrintHeaders, opts = {}) => {
     if (!window.html2pdf) throw new Error('html2pdf missing');
 
+    // ══════════════════════════════════════════════════════════════════
+    // ARCHIV-MODUS (opts.archivKurz === true)
+    // ──────────────────────────────────────────────────────────────────
+    // Der Kunde bekommt die vollstaendige Mappe: Deckblatt, Situation,
+    // Angebote, Danke-/Bonus-Seite.
+    // Fuers ARCHIV sind Deckblatt und Danke-Seite ueberfluessig – sie
+    // enthalten keine Beratungsinhalte, kosten aber Speicher und machen
+    // die Ablage unuebersichtlich. Deshalb werden sie dort weggelassen.
+    // Ergebnis Archiv: Situation + Angebote (+ ggf. Anlagen).
+    // ══════════════════════════════════════════════════════════════════
+    const _archivKurz = opts.archivKurz === true;
+
     const addPageNumbers = false; // FIX: kein "Seite X / N" im Share-PDF
 
     // === ORIENTIERUNG (v42.2) ===
@@ -14956,10 +14993,21 @@ const yy = String(now.getFullYear()).slice(-2);
 const mm = pad2(now.getMonth()+1);
 const dd = pad2(now.getDate());
 const shareDateDisplay = now.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
-// v54: Marken-Farben für Deckblatt/Schlussseite.
-// Telekom-Partner bewusst NICHT im Original-Magenta (#E20074), sondern eigenes Beere-Magenta.
+// ══════════════════════════════════════════════════════════════════════
+// FARBE DER KUNDENUNTERLAGE (Deckblatt + Schlussseite)
+// ──────────────────────────────────────────────────────────────────────
+// Eingestellt auf das originale Telekom-Magenta #E20074 (Stand 07/2026,
+// Entscheidung Diego). Hinweis: Die Farbe ist als Farbmarke geschuetzt –
+// die Nutzung stuetzt sich auf den Telekom-Partnerstatus.
+// ► Falls das zurueckgenommen werden muss: einfach die Zeile darunter
+//   auf die Partner-Variante umstellen (steht als Kommentar bereit).
+// ══════════════════════════════════════════════════════════════════════
+const _TK_MAGENTA = { g1:'#E20074', g2:'#D6006E', g3:'#C40065', chip:'#A6005A', qr:'E20074' };
+// Zurueckhaltende Alternative (kein Original-Magenta):
+// const _TK_MAGENTA = { g1:'#A6216E', g2:'#9C1E67', g3:'#8E1A5E', chip:'#7A1650', qr:'A6216E' };
+
 const _SHARE_THEME = (CURRENT_BRAND === 'telekom')
-  ? { g1:'#7A1650', g2:'#A6216E', g3:'#C43A88', chip:'#7A1650', qr:'A6216E' }
+  ? _TK_MAGENTA
   : { g1:'#1e40af', g2:'#2563eb', g3:'#3b82f6', chip:'#003CA6', qr:'003CA6' };
 // Gutschein-Kürzel folgt der Marke (kein "O2" auf Telekom-Unterlagen)
 const _VOUCHER_BRAND = (CURRENT_BRAND === 'telekom') ? 'TK' : (CURRENT_BRAND === 'vodafone') ? 'VF' : 'O2';
@@ -14969,18 +15017,27 @@ const voucherCode = `${CURRENT_SHOP.code}-${_VOUCHER_BRAND}-${yy}/${mm}/${dd}`;
 const qrUrl = (data, color=_SHARE_THEME.qr) => `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(data)}&color=${color}&bgcolor=ffffff&margin=1`;
 
 const makeCoverContent = () => {
-    // Marken-Farbvariablen ins Share-Dokument setzen (wirkt auf Cover + Outro)
-    try {
-        const r = doc.documentElement;
-        r.style.setProperty('--SHARE_GRAD_1', _SHARE_THEME.g1);
-        r.style.setProperty('--SHARE_GRAD_2', _SHARE_THEME.g2);
-        r.style.setProperty('--SHARE_GRAD_3', _SHARE_THEME.g3);
-        r.style.setProperty('--SHARE_CHIP',   _SHARE_THEME.chip);
-    } catch(_) {}
     const wrap = doc.createElement('div');
     wrap.className = 'share-cover';
+    // Farbe DIREKT am Element setzen. CSS-Variablen von aussen greifen im
+    // Share-iframe nicht zuverlaessig – inline style gewinnt immer.
+    wrap.style.setProperty('background',
+        `linear-gradient(180deg,${_SHARE_THEME.g1} 0%,${_SHARE_THEME.g2} 55%,${_SHARE_THEME.g3} 100%)`, 'important');
+    wrap.style.setProperty('position', 'relative');
+    // Briefumschlag-Muster (wie auf der Telekom-Partnerseite): zwei schraege
+    // Flaechen in der unteren Haelfte. Bewusst als SVG mit preserveAspectRatio
+    // "none" – so skaliert es sauber auf jedes Seitenformat und ueberlebt den
+    // PDF-Export (CSS clip-path wird von html2canvas nicht zuverlaessig gerendert).
+    // Muster nur fuer Telekom – auf o2-Unterlagen bleibt das Deckblatt schlicht
+    const _umschlag = (CURRENT_BRAND === 'telekom') ? `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"
+           style="position:absolute;left:0;right:0;bottom:0;width:100%;height:52%;display:block;pointer-events:none;">
+        <polygon points="0,28 50,72 100,28 100,100 0,100" fill="rgba(0,0,0,0.10)"/>
+        <polygon points="0,34 50,78 100,34 100,100 0,100" fill="rgba(255,255,255,0.07)"/>
+      </svg>` : '';
     wrap.innerHTML = `
-      <div class="share-cover-inner">
+      ${_umschlag}
+      <div class="share-cover-inner" style="position:relative;z-index:2;">
         <div class="share-cover-badge">EXKLUSIV FÜR SIE ERSTELLT</div>
         <div class="share-cover-title">
           <div>Ihr persönliches</div>
@@ -14989,7 +15046,7 @@ const makeCoverContent = () => {
         <div class="share-cover-date">VOM ${shareDateDisplay}</div>
 
         <div class="share-cover-card">
-          <div class="share-cover-chip">${(CURRENT_SHOP.ort || '').toUpperCase()}</div>
+          <div class="share-cover-chip" style="background:${_SHARE_THEME.chip} !important">${(CURRENT_SHOP.ort || '').toUpperCase()}</div>
           <div class="share-cover-shop">
             <div class="share-cover-shop-name">${CURRENT_SHOP.name}</div>
             <div class="share-cover-shop-addr">${CURRENT_SHOP.adresse}</div>
@@ -15003,6 +15060,18 @@ const makeCoverContent = () => {
 const makeOutroContent = () => {
     const wrap = doc.createElement('div');
     wrap.className = 'share-outro';
+    // Gleiche Logik wie beim Deckblatt: Farbe inline, nicht ueber Variablen.
+    wrap.style.setProperty('background',
+        `linear-gradient(180deg,${_SHARE_THEME.g1} 0%,${_SHARE_THEME.g2} 55%,${_SHARE_THEME.g3} 100%)`, 'important');
+    wrap.style.setProperty('position', 'relative');
+    // Umschlag-Muster hier gespiegelt (oeffnet nach oben). Bewusst SEHR dezent:
+    // die Karten liegen darueber, eine kraeftige Kante wuerde quer durch die
+    // Texte schneiden und die Schrift schlecht lesbar machen.
+    const _umschlagOutro = (CURRENT_BRAND === 'telekom') ? `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"
+           style="position:absolute;left:0;right:0;top:0;width:100%;height:38%;display:block;pointer-events:none;opacity:0.5;">
+        <polygon points="0,0 100,0 100,64 50,20 0,64" fill="rgba(0,0,0,0.035)"/>
+      </svg>` : '';
     // v56: Direkter Bewertungs-Link – soll sofort das Sterne-/Bewertungsfenster öffnen
     // (statt nur das Profil). Google öffnet bei diesem Such-URL-Format mit ludocid (CID)
     // den Knowledge-Panel mit prominentem "Rezension schreiben"-Button.
@@ -15017,13 +15086,14 @@ const makeOutroContent = () => {
         ? ('@' + instagramUrl.replace(/\/+$/,'').split('/').pop())
         : '';
     wrap.innerHTML = `
-      <div class="share-outro-grid">
+      ${_umschlagOutro}
+      <div class="share-outro-grid" style="position:relative;z-index:2;">
         <div class="share-outro-card">
           <div class="share-outro-icon">★</div>
           <div class="share-outro-h">Kurzes Feedback?</div>
           <div class="share-outro-p">Zufrieden mit der Beratung?<br/>Wir freuen uns über 5 Sterne!</div>
           <div class="share-outro-qr">
-            <img crossorigin="anonymous" referrerpolicy="no-referrer" src="${qrUrl(googleReviewUrl,'003CA6')}" alt="QR Google" />
+            <img crossorigin="anonymous" referrerpolicy="no-referrer" src="${qrUrl(googleReviewUrl)}" alt="QR Google" />
           </div>
         </div>
 
@@ -15059,9 +15129,11 @@ const makeOutroContent = () => {
     return wrap;
 };
 
-// Cover als erste Seite
-const coverPage = wrapSharePage('Ihre Angebotsmappe', makeCoverContent(), { includeHeader: false });
-stage.appendChild(coverPage);
+// Cover als erste Seite – im Archiv-Modus nicht (spart Speicher, keine Beratungsinhalte)
+if (!_archivKurz) {
+    const coverPage = wrapSharePage('Ihre Angebotsmappe', makeCoverContent(), { includeHeader: false });
+    stage.appendChild(coverPage);
+}
 
 const page1 = wrapSharePage('Ihre Aktuelle Situation', cloneSituation);
 stage.appendChild(page1);
@@ -15437,6 +15509,21 @@ try {
         const src = sourceOffer.querySelector('.cost-overview-print');
         if (!src) return null;
         const clone = src.cloneNode(true);
+        // cloneNode() kopiert KEINE getippten Werte (nur das value-Attribut).
+        // Ohne das waeren die Kostenfelder im PDF leer – und die Pruefung
+        // "hat die Seite Inhalt?" wuerde faelschlich false liefern.
+        try {
+            const srcFelder = Array.from(src.querySelectorAll('input,textarea'));
+            const dstFelder = Array.from(clone.querySelectorAll('input,textarea'));
+            srcFelder.forEach((sf, i) => {
+                const df = dstFelder[i];
+                if (!df) return;
+                const v = (sf.value != null) ? String(sf.value) : '';
+                df.setAttribute('value', v);
+                try { df.value = v; } catch(_) {}
+                if (df.tagName === 'TEXTAREA') df.textContent = v;
+            });
+        } catch(_) {}
         // Kosten-Canvases explizit bakken (data-cost-key Methode)
         const srcKeyed = Array.from(src.querySelectorAll('canvas[data-cost-key]'));
         srcKeyed.forEach(sc => {
@@ -15649,6 +15736,11 @@ if (offerPageCount === 0) {
 
 // Letzte Seite: Kostenübersicht OBEN (kompakt) + Danke & Bonus darunter
 // Ziel: Kosten nimmt ~42% der Höhe, Danke ~58% — beide vollständig sichtbar
+//
+// WICHTIG (Archiv-Modus): Ohne den Danke-Kasten fuellt der Kostenblock die
+// 210mm nicht aus. Eine fest auf Seitenhoehe gesetzte Box erzeugt dann eine
+// zusaetzliche LEERE Seite im PDF. Deshalb waechst der Wrapper im Archiv
+// nur so weit wie noetig ('auto') statt auf volle Seitenhoehe.
 const outroContentWrap = doc.createElement('div');
 outroContentWrap.style.cssText = [
     'width:100%',
@@ -15664,6 +15756,8 @@ outroContentWrap.style.cssText = [
 ].join(';');
 
 // ── Kostenübersicht oben – scale(0.76) für kompakten Fit ──
+// Bleibt IMMER erhalten, auch im Archiv: Die Kostenwerte stehen nirgends
+// sonst im PDF. Nur der Danke-/Bonus-Kasten darunter entfaellt im Archiv.
 if (costBlock) {
     const COST_SCALE = 0.76;
     const costWrap = doc.createElement('div');
@@ -15737,17 +15831,20 @@ outroInner.style.cssText = [
     'border-radius:10px',
     'width:100%',
 ].join(';');
-const outroNode = makeOutroContent();
-outroNode.style.cssText = (outroNode.style.cssText || '')
-    .replace(/height:[^;]+;?/g, '')
-    .replace(/max-height:[^;]+;?/g, '')
-    .replace(/width:[^;]+;?/g, '')
-    .replace(/max-width:[^;]+;?/g, '')
-    .replace(/margin-left:[^;]+;?/g, '')
-    .replace(/margin-right:[^;]+;?/g, '') +
-    ';height:' + OUTRO_MAX_H + 'px;max-height:' + OUTRO_MAX_H + 'px;overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;width:100%;border-radius:18px;';
-outroInner.appendChild(outroNode);
-outroContentWrap.appendChild(outroInner);
+// Danke-/Bonus-Kasten – immer vorhanden (Kunde wie Archiv).
+{
+    const outroNode = makeOutroContent();
+    outroNode.style.cssText = (outroNode.style.cssText || '')
+        .replace(/height:[^;]+;?/g, '')
+        .replace(/max-height:[^;]+;?/g, '')
+        .replace(/width:[^;]+;?/g, '')
+        .replace(/max-width:[^;]+;?/g, '')
+        .replace(/margin-left:[^;]+;?/g, '')
+        .replace(/margin-right:[^;]+;?/g, '') +
+        ';height:' + OUTRO_MAX_H + 'px;max-height:' + OUTRO_MAX_H + 'px;overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;width:100%;border-radius:18px;';
+    outroInner.appendChild(outroNode);
+    outroContentWrap.appendChild(outroInner);
+}
 
 // Kosten + Dankeschön-Seite ZUERST (vor Anlage)
 const outroPage = wrapSharePage('Danke & Bonus', outroContentWrap, { includeHeader: false });
@@ -15766,7 +15863,20 @@ try {
         const pel = document.querySelector('.print-netzwerk-anlage');
         if (pel) anlageHtml = pel.innerHTML || '';
     }
-    if (anlageHtml && anlageHtml.trim().length > 10) {
+    // Pruefung auf ECHTEN Inhalt, nicht nur auf HTML-Laenge.
+    // Ein leeres Geruest (verschachtelte divs ohne Text) ist schnell laenger
+    // als 10 Zeichen – genau dadurch entstand im Archiv eine leere Seite.
+    const _anlageHatInhalt = (() => {
+        if (!anlageHtml || anlageHtml.trim().length < 10) return false;
+        try {
+            const probe = doc.createElement('div');
+            probe.innerHTML = anlageHtml;
+            const txt = (probe.textContent || '').replace(/\s+/g, '');
+            if (txt.length > 3) return true;                  // sichtbarer Text
+            return !!probe.querySelector('img,canvas,svg');   // oder Grafik
+        } catch(e) { return true; }  // im Zweifel anhaengen (lieber zu viel als fehlend)
+    })();
+    if (_anlageHatInhalt) {
         const p3content = doc.createElement('div');
         p3content.style.cssText = 'width:100%;height:100%;overflow:hidden;box-sizing:border-box;background:#ffffff;';
         p3content.innerHTML = anlageHtml;
@@ -15781,6 +15891,31 @@ try {
 
     // Layout settle
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // ══════════════════════════════════════════════════════════════════
+    // LEERSEITEN-FIX: Container exakt auf die gebauten Seiten kappen.
+    // ──────────────────────────────────────────────────────────────────
+    // html2pdf schneidet das gerenderte Bild stur in A4-Scheiben. Ist der
+    // Container auch nur ein paar Pixel hoeher als (Seitenzahl x Seitenhoehe)
+    // – z.B. durch Raender, Rundungen oder eine Seite weniger als sonst –
+    // entsteht daraus eine zusaetzliche, komplett leere Seite.
+    // Deshalb hier die tatsaechliche Seitenzahl zaehlen und die Hoehe von
+    // Stage und Container exakt darauf festnageln.
+    try {
+        const _seiten = stage.querySelectorAll(':scope > .share-page').length;
+        if (_seiten > 0) {
+            const _hoehe = _seiten * SHARE_PAGE_HEIGHT_PX;
+            stage.style.height    = _hoehe + 'px';
+            stage.style.maxHeight = _hoehe + 'px';
+            stage.style.overflow  = 'hidden';
+            container.style.height    = _hoehe + 'px';
+            container.style.maxHeight = _hoehe + 'px';
+            container.style.overflow  = 'hidden';
+            try { doc.body.style.height = _hoehe + 'px'; doc.body.style.overflow = 'hidden'; } catch(_) {}
+            console.log('[PDF] Seiten:', _seiten, '· Hoehe:', _hoehe + 'px');
+        }
+    } catch(e) { console.warn('Seitenhoehen-Fix:', e); }
+
 
     // A4 Landscape in points
     const A4_LANDSCAPE_PT = [841.89, 595.28];
@@ -16437,7 +16572,7 @@ const backgroundAutoUpload = async ({ type, triggerToast, ensurePrintHeaders, ge
         const _webhook = (() => { try { return localStorage.getItem('ps_pa_webhook') || ''; } catch(e) { return ''; } })();
         const _hasTarget = (typeof PA_UPLOAD_URL === 'string' && PA_UPLOAD_URL && !PA_UPLOAD_URL.includes('PASTE_POWER_AUTOMATE_FLOW_URL_HERE')) || !!_webhook;
         if (!_hasTarget) return; // Upload-Funktion bewusst inaktiv → nichts rendern, nichts senden
-        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true });
+        const blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true, archivKurz: true });
         const dateISO = new Date().toISOString();
         const agent = getAgent();
         const dsl = getDsl();
@@ -16988,7 +17123,7 @@ const sendToArchive = async (archiveType, opts = {}) => {
         document.body.classList.add('exporting');
         showOverlay2('Archiv-PDF wird erstellt …');
         const _t = setTimeout(()=>{ try{hideOverlay2();}catch(e){} try{document.body.classList.remove('exporting');}catch(e){} }, 30000);
-        blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true });
+        blob = await createPrintLookPdfBlob(triggerToast, ensurePrintHeaders, { addPageNumbers: true, archivKurz: true });
         clearTimeout(_t);
         hideOverlay2();
         try { document.body.classList.remove('exporting'); } catch(e){}
@@ -17832,7 +17967,7 @@ const resumeParkedArchive = async (entry, rufValue) => {
         </div>
     );
 })()}
-<BundleModal isOpen={showBundleModal} onClose={() => setShowBundleModal(false)} url={bundleModalUrl} onImportToCanvas={importBundleToCanvas} triggerToast={triggerToast} targetKey={bundleTargetKey} />
+<BundleModal isOpen={AKTIONSMAPPE_AKTIV && showBundleModal} onClose={() => setShowBundleModal(false)} url={bundleModalUrl} onImportToCanvas={importBundleToCanvas} triggerToast={triggerToast} targetKey={bundleTargetKey} />
 {pendingBundleImport && (() => {
     const keyLabels = { offer1: '1. Hardware, Anbieter & Nutzung', offer2: '2. Haushalt und weitere Produkte', offer3: '3. Weiteres Angebot' };
     const label = keyLabels[pendingBundleImport.key] || pendingBundleImport.key;
@@ -19794,7 +19929,7 @@ const resumeParkedArchive = async (entry, rufValue) => {
                             <button onClick={()=>{loadOffersList();setShowSavedOffers(true);}} className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-blue-500 hover:bg-blue-50 transition-colors" title="📋 Gespeicherte Angebote"><Icon d={ICONS.List} size={18}/></button>
                             <button onClick={() => { if (LINK_EMPLOYEE === 'Diego da Silva' || isExemptEmployee) { handleSkipToOffer('Übersprungen (Admin)'); } else { setShowSkipReasonModal(true); } }} className="px-4 py-2 text-slate-500 font-bold text-xs hover:bg-slate-100 rounded-lg transition-colors">Überspringen</button>
                             <button onClick={() => { if(isFormValid){ setView('offer'); setViewOfferCounter(c => c + 1); } }} className={`px-6 py-2 rounded-lg font-bold shadow-lg text-sm flex items-center gap-2 transition-all ${isFormValid ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`} title={isFormValid ? "Weiter zum Angebot" : "Bitte Pflichtfelder ausfüllen (Kundentyp, Segment, Anbieter)"}>Zum Angebot <Icon d={ICONS.ArrowRight} size={18} /></button>
-                        </div></>) : (<div className="w-full flex justify-between items-center"><div className="flex items-center gap-3"><div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm"><button onClick={() => setInputMode('pen')} className={`p-2 rounded-md transition-colors ${inputMode === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`} title="Stift-Modus (Stylus Only)"><Icon d={ICONS.Pen} size={16} /></button><button onClick={() => setInputMode('keyboard')} className={`p-2 rounded-md transition-colors ${inputMode === 'keyboard' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`} title="Tastatur-Modus"><Icon d={ICONS.Keyboard} size={16} /></button></div>{inputMode === 'pen' && (<div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm animate-in items-center relative z-50">{renderPenToolButtons()}{(tool === 'pen' || tool === 'fountain' || tool === 'ballpen' || tool === 'highlighter') && (<div className="opacity-slider-group flex items-center gap-2 bg-slate-50 rounded border border-slate-200 p-1.5 ml-2"><Icon d={ICONS.Sun} size={16} className="text-slate-400"/><input type="range" min="10" max="100" value={Math.round(opacity * 100)} onChange={(e) => setOpacity(parseInt(e.target.value) / 100)} className="w-20 h-1 appearance-none bg-blue-200 rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg" title={`Deckkraft: ${Math.round(opacity * 100)}%`}/></div>)}<div className="toolbar-divider w-px h-6 bg-slate-200 mx-1"></div><div className="color-picker-group relative"><button onClick={() => setShowColorPicker(!showColorPicker)} className="w-8 h-8 rounded-full border shadow-sm flex items-center justify-center ring-offset-2 focus:ring-2" style={{ backgroundColor: color }}><Icon d={ICONS.Palette} size={12} className="text-white mix-blend-difference" /></button>{showColorPicker && (<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-white p-3 rounded-xl shadow-2xl border border-slate-200 grid grid-cols-4 gap-2 w-[180px] z-[100]"><div className="col-span-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center mb-1">Farbe wählen</div>{COLORS.map(c => <button key={c.id} onClick={() => { setColor(c.value); setShowColorPicker(false); if(c.id==='white') triggerToast('Weiß: auf hellem Canvas kaum sichtbar!'); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c.value ? 'border-slate-400 shadow-inner scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} title={c.label} />)}</div>)}</div></div>)}{inputMode === 'keyboard' && (<div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm animate-in items-center relative z-50"><div className="flex bg-slate-50 rounded border border-slate-200 p-0.5 gap-0.5"><button onClick={() => setTextSize('small')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'small' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'11px'}}>S</button><button onClick={() => setTextSize('medium')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'medium' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'14px'}}>M</button><button onClick={() => setTextSize('large')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'large' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'18px'}}>L</button></div><div className="w-px h-6 bg-slate-200 mx-1"></div><div className="flex gap-1"><button onClick={() => setTextStyle(p => ({...p, bold: !p.bold}))} className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${textStyle.bold ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-200' : 'text-slate-500 hover:bg-slate-100'}`} title="Fett" style={{fontSize:'16px',fontWeight:900}}>F</button><button onClick={() => setTextStyle(p => ({...p, italic: !p.italic}))} className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${textStyle.italic ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-200' : 'text-slate-500 hover:bg-slate-100'}`} title="Kursiv" style={{fontStyle:'italic',fontFamily:'Georgia,serif',fontSize:'15px',fontWeight:600}}>K</button></div></div>)}</div><div className="footer-action-icons flex items-center gap-4"><button onClick={handleFileAdd} className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors" title="Datei hinzufügen (Kamera / Ordner)"><Icon d={ICONS.Folder} size={18}/></button><div className="relative"><button onClick={() => setShowLanguageDropdown(p => !p)} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-100 transition-colors" title={`Sprache: ${SORTED_LANGUAGES.find(l => l.code === displayLanguage)?.name || 'Deutsch'}`}><div className="relative flex items-center justify-center"><Icon d={ICONS.Globe} size={18} className="text-slate-500"/>{displayLanguage !== 'de' && (<span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-black text-white mix-blend-difference leading-none pointer-events-none">{displayLanguage.toUpperCase()}</span>)}</div></button>{showLanguageDropdown && (<div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in"><div className="p-2 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase">Sprache wählen</div>{SORTED_LANGUAGES.map(lang => (<button key={lang.code} onClick={() => { setDisplayLanguage(lang.code); setShowLanguageDropdown(false); }} className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${displayLanguage === lang.code ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-100'}`}>{lang.name}{displayLanguage === lang.code && <Icon d={ICONS.CheckCircle} size={14} className="ml-auto"/>}</button>))}</div>)}</div><div className="flex items-center">{showShareButton && view !== 'offer' && (<button onClick={handlePDFShare} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100 text-blue-600 transition-colors mr-2 flex items-center justify-center w-10 h-10" title="Angebot teilen (System)"><Icon d={ICONS.Share} size={20} className="w-5 h-5" /></button>)}<a href="https://hetec-it.github.io/Freunde-werben-Freunde/" target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors mr-2 flex items-center justify-center" title="Freunde werben (Link)"><Icon d={ICONS.Users} size={18}/></a><button onClick={openOneDriveLink} className="p-2 bg-slate-50 text-slate-500 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-100 hover:text-blue-600 transition-colors mr-2 flex items-center justify-center" title="Aktionsmappe öffnen"><Icon d={ICONS.Flyer} size={18}/></button>
+                        </div></>) : (<div className="w-full flex justify-between items-center"><div className="flex items-center gap-3"><div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm"><button onClick={() => setInputMode('pen')} className={`p-2 rounded-md transition-colors ${inputMode === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`} title="Stift-Modus (Stylus Only)"><Icon d={ICONS.Pen} size={16} /></button><button onClick={() => setInputMode('keyboard')} className={`p-2 rounded-md transition-colors ${inputMode === 'keyboard' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`} title="Tastatur-Modus"><Icon d={ICONS.Keyboard} size={16} /></button></div>{inputMode === 'pen' && (<div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm animate-in items-center relative z-50">{renderPenToolButtons()}{(tool === 'pen' || tool === 'fountain' || tool === 'ballpen' || tool === 'highlighter') && (<div className="opacity-slider-group flex items-center gap-2 bg-slate-50 rounded border border-slate-200 p-1.5 ml-2"><Icon d={ICONS.Sun} size={16} className="text-slate-400"/><input type="range" min="10" max="100" value={Math.round(opacity * 100)} onChange={(e) => setOpacity(parseInt(e.target.value) / 100)} className="w-20 h-1 appearance-none bg-blue-200 rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg" title={`Deckkraft: ${Math.round(opacity * 100)}%`}/></div>)}<div className="toolbar-divider w-px h-6 bg-slate-200 mx-1"></div><div className="color-picker-group relative"><button onClick={() => setShowColorPicker(!showColorPicker)} className="w-8 h-8 rounded-full border shadow-sm flex items-center justify-center ring-offset-2 focus:ring-2" style={{ backgroundColor: color }}><Icon d={ICONS.Palette} size={12} className="text-white mix-blend-difference" /></button>{showColorPicker && (<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-white p-3 rounded-xl shadow-2xl border border-slate-200 grid grid-cols-4 gap-2 w-[180px] z-[100]"><div className="col-span-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center mb-1">Farbe wählen</div>{COLORS.map(c => <button key={c.id} onClick={() => { setColor(c.value); setShowColorPicker(false); if(c.id==='white') triggerToast('Weiß: auf hellem Canvas kaum sichtbar!'); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c.value ? 'border-slate-400 shadow-inner scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} title={c.label} />)}</div>)}</div></div>)}{inputMode === 'keyboard' && (<div className="flex gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm animate-in items-center relative z-50"><div className="flex bg-slate-50 rounded border border-slate-200 p-0.5 gap-0.5"><button onClick={() => setTextSize('small')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'small' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'11px'}}>S</button><button onClick={() => setTextSize('medium')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'medium' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'14px'}}>M</button><button onClick={() => setTextSize('large')} className={`w-8 h-8 flex items-center justify-center rounded font-bold ${textSize === 'large' ? 'bg-white shadow text-blue-600 ring-1 ring-blue-100' : 'text-slate-500 hover:bg-slate-200'}`} style={{fontSize:'18px'}}>L</button></div><div className="w-px h-6 bg-slate-200 mx-1"></div><div className="flex gap-1"><button onClick={() => setTextStyle(p => ({...p, bold: !p.bold}))} className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${textStyle.bold ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-200' : 'text-slate-500 hover:bg-slate-100'}`} title="Fett" style={{fontSize:'16px',fontWeight:900}}>F</button><button onClick={() => setTextStyle(p => ({...p, italic: !p.italic}))} className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${textStyle.italic ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-200' : 'text-slate-500 hover:bg-slate-100'}`} title="Kursiv" style={{fontStyle:'italic',fontFamily:'Georgia,serif',fontSize:'15px',fontWeight:600}}>K</button></div></div>)}</div><div className="footer-action-icons flex items-center gap-4"><button onClick={handleFileAdd} className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors" title="Datei hinzufügen (Kamera / Ordner)"><Icon d={ICONS.Folder} size={18}/></button><div className="relative"><button onClick={() => setShowLanguageDropdown(p => !p)} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-100 transition-colors" title={`Sprache: ${SORTED_LANGUAGES.find(l => l.code === displayLanguage)?.name || 'Deutsch'}`}><div className="relative flex items-center justify-center"><Icon d={ICONS.Globe} size={18} className="text-slate-500"/>{displayLanguage !== 'de' && (<span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-black text-white mix-blend-difference leading-none pointer-events-none">{displayLanguage.toUpperCase()}</span>)}</div></button>{showLanguageDropdown && (<div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in"><div className="p-2 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase">Sprache wählen</div>{SORTED_LANGUAGES.map(lang => (<button key={lang.code} onClick={() => { setDisplayLanguage(lang.code); setShowLanguageDropdown(false); }} className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${displayLanguage === lang.code ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-100'}`}>{lang.name}{displayLanguage === lang.code && <Icon d={ICONS.CheckCircle} size={14} className="ml-auto"/>}</button>))}</div>)}</div><div className="flex items-center">{showShareButton && view !== 'offer' && (<button onClick={handlePDFShare} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100 text-blue-600 transition-colors mr-2 flex items-center justify-center w-10 h-10" title="Angebot teilen (System)"><Icon d={ICONS.Share} size={20} className="w-5 h-5" /></button>)}<a href="https://hetec-it.github.io/Freunde-werben-Freunde/" target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors mr-2 flex items-center justify-center" title="Freunde werben (Link)"><Icon d={ICONS.Users} size={18}/></a>{AKTIONSMAPPE_AKTIV && (<button onClick={openOneDriveLink} className="p-2 bg-slate-50 text-slate-500 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-100 hover:text-blue-600 transition-colors mr-2 flex items-center justify-center" title="Aktionsmappe öffnen"><Icon d={ICONS.Flyer} size={18}/></button>)}
                                 {/* ── Gutschrift-Rechner Icon-Button ── */}
                                 {(()=>{
                                     const gut2 = parseFloat(gutschriftBetrag.replace(',','.')) || 0;
