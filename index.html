@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- ══════════════════════════════════════════════════════════════════════
-         KEIN HTML-CACHE  (v53.0)
+         KEIN HTML-CACHE  (v54.0)
          Android/Chrome hielt diese Datei sonst tagelang im Cache: nach einem
          Update lief auf dem Tablet weiter die ALTE Version, Fehlerkorrekturen
          kamen nie an. Die CDN-Bibliotheken bleiben davon unberührt.
@@ -109,7 +109,7 @@
     </script>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         VERSION + CACHE-BUSTING  (v53.0)
+         VERSION + CACHE-BUSTING  (v54.0)
          ──────────────────────────────────────────────────────────────────────
          Android/Chrome hält HTML von GitHub Pages sehr hartnäckig im Cache.
          Ohne diesen Block sieht der Mitarbeiter nach einem Update weiterhin
@@ -117,7 +117,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '53.0';
+    window.APP_VERSION = '54.1';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -4271,6 +4271,10 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
             </svg>
         );
 
+        // v54: Kosten (Ist) durch Business Check ersetzt.
+        // Auf true setzen, um den alten Kosten-Block wieder einzublenden.
+        const SHOW_KOSTEN_IST = false;
+
         const ICONS = {
             Search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
             User: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -6391,6 +6395,292 @@ for (const [key, strokes] of Object.entries(drawnStrokes)) {
             'Technischer Fehler / App-Problem',
             'Sonstiges (bitte beschreiben)'
         ];
+        // ═══════════════════════════════════════════════════════════════════
+        // BUSINESS CHECK MODAL — VVL MagentaZuhause vs. Business DSL Start
+        // Ersetzt den früheren "Kosten (Ist)"-Sidebar-Block.
+        // ═══════════════════════════════════════════════════════════════════
+        const BusinessCheckModal = ({ isOpen, onClose, onUebernehmen, triggerToast }) => {
+            const MWST = 1.19;
+            const LAUFZEIT = 24;
+            const AKTION_NETTO = 9.95, AKTION_MON = 6;
+            const VVL_AKTION = 9.95, VVL_MON = 3;
+
+            const MAGENTA = {
+                s:  {name:'MagentaZuhause S',  speed:'16 Mbit/s',  ziel:'50'},
+                m:  {name:'MagentaZuhause M',  speed:'50 Mbit/s',  ziel:'50'},
+                l:  {name:'MagentaZuhause L',  speed:'100 Mbit/s', ziel:'100'},
+                xl: {name:'MagentaZuhause XL', speed:'250 Mbit/s', ziel:'250'}
+            };
+            const BUSINESS = {
+                '50':  {name:'Business DSL 50 Start',  speed:'50 Mbit/s',  netto:44.95, mobilfunk:false},
+                '100': {name:'Business DSL 100 Start', speed:'100 Mbit/s', netto:49.95, mobilfunk:true},
+                '250': {name:'Business DSL 250 Start', speed:'250 Mbit/s', netto:59.95, mobilfunk:false}
+            };
+
+            const [magenta, setMagenta] = useState('l');
+            const [business, setBusiness] = useState('100');
+            const [ist, setIst] = useState('48.95');
+            const [vvl, setVvl] = useState('44.95');
+            const [onlineVorteil, setOnlineVorteil] = useState('100');
+            const [gutschrift, setGutschrift] = useState('0');
+            const [tel, setTel] = useState(1);
+            const [vorsteuer, setVorsteuer] = useState(0);
+
+            if (!isOpen) return null;
+
+            const eur = (n) => n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+            const num = (v) => parseFloat(String(v).replace(',','.')) || 0;
+
+            const mag = MAGENTA[magenta];
+            const biz = BUSINESS[business];
+            const istV = num(ist), vvlV = num(vvl);
+            const ovV = num(onlineVorteil), gsV = num(gutschrift);
+            const einmalig = ovV + gsV;
+
+            const bizBrutto = biz.netto * MWST;
+            const aktionBrutto = AKTION_NETTO * MWST;
+
+            const vvlGesamt = VVL_AKTION * VVL_MON + vvlV * (LAUFZEIT - VVL_MON);
+            const bizGesamt = aktionBrutto * AKTION_MON + bizBrutto * (LAUFZEIT - AKTION_MON) - einmalig;
+            const diff = vvlGesamt - bizGesamt;
+            const diffMtl = diff / LAUFZEIT;
+
+            const vorsteuerVorteil = vorsteuer
+                ? (bizBrutto - biz.netto) * (LAUFZEIT - AKTION_MON) + (aktionBrutto - AKTION_NETTO) * AKTION_MON
+                : 0;
+            const diffNachVorsteuer = diff + vorsteuerVorteil;
+
+            // Empfehlung
+            let vCls, vTitle, vText;
+            if (diff > 0) {
+                vCls = 'go'; vTitle = 'Business rechnet sich';
+                vText = 'Brutto gegen brutto spart der Kunde über 24 Monate ' + eur(diff) + ', also rund ' + eur(diffMtl) + ' im Monat.'
+                    + (vorsteuer ? ' Mit Vorsteuerabzug kommen nochmal ' + eur(vorsteuerVorteil) + ' dazu.' : '')
+                    + ' Dazu die Business-Leistungen obendrauf.';
+            } else if (vorsteuer && diffNachVorsteuer > 0) {
+                vCls = 'go'; vTitle = 'Business lohnt sich – über den Vorsteuerabzug';
+                vText = 'Brutto ist Business zunächst ' + eur(Math.abs(diff)) + ' teurer. Da der Kunde die Vorsteuer zurückholt ('
+                    + eur(vorsteuerVorteil) + ' über die Laufzeit), bleibt unter dem Strich ein Vorteil von ' + eur(diffNachVorsteuer)
+                    + '. Das Argument steht und fällt mit dem Vorsteuerabzug – genau so im Gespräch erklären.';
+            } else {
+                vCls = 'stop'; vTitle = 'Rechnerisch ist die VVL günstiger';
+                const noetig = Math.ceil((Math.abs(diff) + gsV) / 10) * 10;
+                vText = 'Business kostet über 24 Monate ' + eur(Math.abs(diff)) + ' mehr, also etwa ' + eur(Math.abs(diffMtl)) + ' im Monat'
+                    + (vorsteuer ? ' – auch nach Vorsteuerabzug bleiben ' + eur(Math.abs(diffNachVorsteuer)) + ' Mehrkosten.' : '.')
+                    + ' Ab rund ' + eur(noetig) + ' Gutschrift dreht die Rechnung. Darunter lohnt es nur, wenn dem Kunden feste IP, '
+                    + 'Business-Hotline oder die schnellere Entstörung den Aufpreis wert sind – dann offen ansprechen.';
+            }
+
+            const pro = [
+                'Aktionspreis läuft ' + AKTION_MON + ' statt ' + VVL_MON + ' Monate',
+                'Keine Bereitstellungsgebühr',
+                'Priorisierte Entstörung mit zugesicherter Reaktionszeit',
+                'Business-Hotline statt Privatkunden-Warteschleife',
+                'Feste IP buchbar',
+                eur(ovV) + ' Online-Vorteil'
+            ];
+            if (gsV > 0) pro.push(eur(gsV) + ' Gutschrift obendrauf');
+            if (biz.mobilfunk) pro.push('Mobilfunkflat aktuell inklusive');
+            if (vorsteuer) pro.push('Vorsteuer abziehbar – ' + eur(vorsteuerVorteil) + ' Rückholung über 24 Monate');
+
+            const con = [
+                'MagentaEINS-Vorteil auf den Privat-Mobilfunk fällt weg',
+                'TV- und Streaming-Optionen der Privattarife entfallen',
+                'Rückwechsel ins Privatkundensegment ist aufwendig'
+            ];
+            if (!vorsteuer) con.unshift('Ohne Vorsteuerabzug zählt der Bruttopreis von ' + eur(bizBrutto) + ' – hier liegt der Nachteil');
+            if (!tel) con.push('Telefonie ist im Business-Tarif enthalten – Bedarf vorher klären');
+
+            const M = '#E20074';
+            const lbl = {display:'block',fontSize:'12px',fontWeight:800,marginBottom:'5px',color:'#12121a'};
+            const sub = {display:'block',fontWeight:500,color:'#4a4a5a',fontSize:'11px',marginTop:'1px'};
+            const inp = {width:'100%',padding:'10px 12px',fontSize:'15px',fontFamily:'inherit',color:'#12121a',background:'#fff',
+                         border:'1.5px solid #e3e3ec',borderRadius:'10px',outline:'none',boxSizing:'border-box'};
+            const card = {background:'#fff',border:'1px solid #e3e3ec',borderRadius:'16px',padding:'16px',marginBottom:'14px'};
+            const h2 = {fontSize:'11px',fontWeight:800,letterSpacing:'.1em',textTransform:'uppercase',color:'#4a4a5a',margin:'0 0 14px',display:'flex',alignItems:'center',gap:'8px'};
+            const stepDot = {display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'50%',background:'#12121a',color:'#fff',fontSize:'11px',fontWeight:800,flexShrink:0};
+            const td = {padding:'9px 8px',textAlign:'right',borderBottom:'1px solid #e3e3ec',fontSize:'13px'};
+            const tdL = {...td,textAlign:'left',fontWeight:600};
+            const th = {...td,fontSize:'10px',letterSpacing:'.08em',textTransform:'uppercase',color:'#4a4a5a',fontWeight:800,borderBottom:'2px solid #12121a'};
+
+            const rows = [
+                ['Bandbreite', mag.speed, biz.speed],
+                ['Zahlt heute', eur(istV), '–'],
+                ['Aktionspreis brutto', eur(VVL_AKTION) + ' · ' + VVL_MON + ' Mon.', eur(aktionBrutto) + ' · ' + AKTION_MON + ' Mon.'],
+                ['Danach mtl. brutto', eur(vvlV), eur(bizBrutto)],
+                ['davon netto', eur(vvlV / MWST), eur(biz.netto)],
+                ['Online-Vorteil', '–', '− ' + eur(ovV)],
+                ['Gutschrift', '–', gsV > 0 ? '− ' + eur(gsV) : '–']
+            ];
+
+            const toggleBtn = (act) => ({flex:1,padding:'10px 8px',fontSize:'13px',fontWeight:700,fontFamily:'inherit',
+                background: act ? M : '#fff', color: act ? '#fff' : '#4a4a5a',
+                border:'1.5px solid ' + (act ? M : '#e3e3ec'), borderRadius:'10px',cursor:'pointer'});
+
+            return (
+                <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:99000,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}} onClick={onClose}>
+                    <div onClick={e=>e.stopPropagation()} style={{background:'#f6f6fa',borderRadius:'20px',width:'min(96vw,880px)',maxHeight:'92vh',overflowY:'auto',boxShadow:'0 25px 60px rgba(0,0,0,0.35)'}}>
+
+                        {/* Header */}
+                        <div style={{position:'sticky',top:0,zIndex:2,background:'#fff',borderBottom:'1px solid #e3e3ec',padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderRadius:'20px 20px 0 0'}}>
+                            <div>
+                                <div style={{display:'inline-block',fontSize:'10px',fontWeight:800,letterSpacing:'.14em',textTransform:'uppercase',color:M,border:'1.5px solid '+M,borderRadius:'999px',padding:'3px 10px',marginBottom:'6px'}}>Telekom · Gewerbe</div>
+                                <h1 style={{fontSize:'20px',fontWeight:900,margin:0,letterSpacing:'-.02em',color:'#12121a'}}>Business-Check</h1>
+                                <p style={{margin:'2px 0 0',fontSize:'12px',color:'#4a4a5a'}}>Vertragsverlängerung MagentaZuhause gegen Business DSL Start rechnen.</p>
+                            </div>
+                            <button onClick={onClose} style={{width:'34px',height:'34px',borderRadius:'10px',border:'1px solid #e3e3ec',background:'#fff',cursor:'pointer',fontSize:'18px',color:'#4a4a5a',flexShrink:0}}>✕</button>
+                        </div>
+
+                        <div style={{padding:'16px 20px 20px'}}>
+
+                            {/* 1 Bestand */}
+                            <div style={card}>
+                                <h2 style={h2}><span style={stepDot}>1</span>Aktueller Anschluss</h2>
+                                <label style={{display:'block',marginBottom:'12px'}}>
+                                    <span style={lbl}>Tarif</span>
+                                    <select value={magenta} onChange={e=>{setMagenta(e.target.value); setBusiness(MAGENTA[e.target.value].ziel);}} style={inp}>
+                                        <option value="s">MagentaZuhause S · 16 Mbit/s</option>
+                                        <option value="m">MagentaZuhause M · 50 Mbit/s</option>
+                                        <option value="l">MagentaZuhause L · 100 Mbit/s</option>
+                                        <option value="xl">MagentaZuhause XL · 250 Mbit/s</option>
+                                    </select>
+                                </label>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
+                                    <label>
+                                        <span style={lbl}>Zahlt aktuell mtl.<small style={sub}>Brutto, von der Rechnung ablesen</small></span>
+                                        <input type="number" value={ist} onChange={e=>setIst(e.target.value)} min="0" step="0.01" inputMode="decimal" style={inp}/>
+                                    </label>
+                                    <label>
+                                        <span style={lbl}>VVL-Angebot mtl.<small style={sub}>Brutto, was er bei Verlängerung zahlt</small></span>
+                                        <input type="number" value={vvl} onChange={e=>setVvl(e.target.value)} min="0" step="0.01" inputMode="decimal" style={inp}/>
+                                    </label>
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
+                                    <label>
+                                        <span style={lbl}>Telefonie inklusive?</span>
+                                        <div style={{display:'flex',gap:'6px'}}>
+                                            <button type="button" onClick={()=>setTel(1)} style={toggleBtn(tel===1)}>Ja, Flat</button>
+                                            <button type="button" onClick={()=>setTel(0)} style={toggleBtn(tel===0)}>Nur Internet</button>
+                                        </div>
+                                    </label>
+                                    <label>
+                                        <span style={lbl}>Vorsteuerabzug?<small style={sub}>Kunde holt MwSt. zurück</small></span>
+                                        <div style={{display:'flex',gap:'6px'}}>
+                                            <button type="button" onClick={()=>setVorsteuer(1)} style={toggleBtn(vorsteuer===1)}>Ja</button>
+                                            <button type="button" onClick={()=>setVorsteuer(0)} style={toggleBtn(vorsteuer===0)}>Nein</button>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* 2 Ziel */}
+                            <div style={card}>
+                                <h2 style={h2}><span style={stepDot}>2</span>Business-Tarif</h2>
+                                <label style={{display:'block',marginBottom:'12px'}}>
+                                    <span style={lbl}>Zieltarif<small style={sub}>Vorschlag passend zur Bandbreite, frei änderbar</small></span>
+                                    <select value={business} onChange={e=>setBusiness(e.target.value)} style={inp}>
+                                        <option value="50">Business DSL 50 Start · 44,95 € netto</option>
+                                        <option value="100">Business DSL 100 Start · 49,95 € netto</option>
+                                        <option value="250">Business DSL 250 Start · 59,95 € netto</option>
+                                    </select>
+                                </label>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
+                                    <label>
+                                        <span style={lbl}>Online-Vorteil<small style={sub}>Standard 100 €, einmalig</small></span>
+                                        <input type="number" value={onlineVorteil} onChange={e=>setOnlineVorteil(e.target.value)} min="0" step="10" inputMode="decimal" style={inp}/>
+                                    </label>
+                                    <label>
+                                        <span style={lbl}>Zusätzliche Gutschrift<small style={sub}>Was du obendrauf gibst</small></span>
+                                        <input type="number" value={gutschrift} onChange={e=>setGutschrift(e.target.value)} min="0" step="10" inputMode="decimal" style={inp}/>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Verdict */}
+                            <div style={{borderRadius:'16px',padding:'16px 18px',marginBottom:'14px',
+                                background: vCls==='go' ? '#e7f6f0' : '#fdf3e0',
+                                border:'1.5px solid ' + (vCls==='go' ? '#b6e2d3' : '#f0dcb0')}}>
+                                <h3 style={{margin:'0 0 5px',fontSize:'17px',fontWeight:900,letterSpacing:'-.01em',color: vCls==='go' ? '#0d7d5a' : '#8a5a00'}}>{vTitle}</h3>
+                                <p style={{margin:0,fontSize:'13px',lineHeight:1.55,color:'#4a4a5a'}}>{vText}</p>
+                            </div>
+
+                            {/* Tabelle */}
+                            <div style={card}>
+                                <h2 style={h2}>Gegenüberstellung · 24 Monate</h2>
+                                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                                    <thead><tr><th style={th}></th><th style={th}>{mag.name}</th><th style={{...th,color:M}}>{biz.name}</th></tr></thead>
+                                    <tbody>
+                                        {rows.map((r,i)=>(
+                                            <tr key={i}>
+                                                <td style={{...tdL, color: r[0]==='davon netto' ? '#4a4a5a':'#12121a', fontWeight: r[0]==='davon netto'?500:600}}>{r[0]}</td>
+                                                <td style={{...td, color: r[0]==='davon netto'?'#4a4a5a':'#12121a'}}>{r[1]}</td>
+                                                <td style={{...td, color: r[0]==='davon netto'?'#4a4a5a':'#12121a'}}>{r[2]}</td>
+                                            </tr>
+                                        ))}
+                                        <tr><td style={{...tdL,fontWeight:800,fontSize:'14px',background:'#f6f6fa'}}>Gesamt 24 Monate</td>
+                                            <td style={{...td,fontWeight:800,fontSize:'14px',background:'#f6f6fa'}}>{eur(vvlGesamt)}</td>
+                                            <td style={{...td,fontWeight:800,fontSize:'14px',background:'#f6f6fa'}}>{eur(bizGesamt)}</td></tr>
+                                        <tr><td style={{...tdL,fontWeight:800,fontSize:'14px',background:'#f6f6fa'}}>Unterschied</td>
+                                            <td colSpan="2" style={{...td,fontWeight:800,fontSize:'14px',background:'#f6f6fa',color: diff>0?'#0d7d5a':'#c0392b'}}>
+                                                {diff>0 ? 'Business spart ' + eur(diff) : 'Business kostet ' + eur(Math.abs(diff)) + ' mehr'}
+                                                <span style={{color:'#4a4a5a',fontWeight:500}}> · {eur(Math.abs(diffMtl))}/Mon.</span>
+                                            </td></tr>
+                                        {vorsteuer ? (
+                                            <tr><td style={{...tdL,fontWeight:800,fontSize:'14px',background:'#f6f6fa'}}>Nach Vorsteuerabzug</td>
+                                                <td colSpan="2" style={{...td,fontWeight:800,fontSize:'14px',background:'#f6f6fa',color: diffNachVorsteuer>0?'#0d7d5a':'#c0392b'}}>
+                                                    {diffNachVorsteuer>0 ? 'Business spart ' + eur(diffNachVorsteuer) : 'Business kostet ' + eur(Math.abs(diffNachVorsteuer)) + ' mehr'}
+                                                    <span style={{color:'#4a4a5a',fontWeight:500}}> · Rückholung {eur(vorsteuerVorteil)}</span>
+                                                </td></tr>
+                                        ) : null}
+                                    </tbody>
+                                </table>
+                                <p style={{fontSize:'11px',color:'#4a4a5a',lineHeight:1.5,borderLeft:'3px solid #e3e3ec',paddingLeft:'11px',marginTop:'14px'}}>
+                                    Beide Seiten brutto gerechnet – die Business-Nettopreise sind mit 19 % MwSt. hochgerechnet, damit der Vergleich auf derselben Basis steht.
+                                    {vorsteuer ? ' Die Zeile darunter zeigt, was der Vorsteuerabzug zusätzlich bringt.' : ' Ohne Vorsteuerabzug ist der Bruttopreis die tatsächliche Belastung.'}
+                                    {' '}Online-Vorteil und Gutschrift sind einmalig gegengerechnet.
+                                </p>
+                            </div>
+
+                            {/* Argumente */}
+                            <div style={card}>
+                                <h2 style={h2}>Im Gespräch</h2>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+                                    <div>
+                                        <h4 style={{fontSize:'10px',fontWeight:800,letterSpacing:'.1em',textTransform:'uppercase',margin:'0 0 8px',color:'#0d7d5a'}}>Dafür</h4>
+                                        <ul style={{margin:0,paddingLeft:'17px'}}>{pro.map((x,i)=><li key={i} style={{fontSize:'12.5px',marginBottom:'6px',lineHeight:1.45,color:'#4a4a5a'}}>{x}</li>)}</ul>
+                                    </div>
+                                    <div>
+                                        <h4 style={{fontSize:'10px',fontWeight:800,letterSpacing:'.1em',textTransform:'uppercase',margin:'0 0 8px',color:'#c0392b'}}>Dagegen – offen ansprechen</h4>
+                                        <ul style={{margin:0,paddingLeft:'17px'}}>{con.map((x,i)=><li key={i} style={{fontSize:'12.5px',marginBottom:'6px',lineHeight:1.45,color:'#4a4a5a'}}>{x}</li>)}</ul>
+                                    </div>
+                                </div>
+                                <p style={{fontSize:'11px',color:'#4a4a5a',lineHeight:1.5,borderLeft:'3px solid #e3e3ec',paddingLeft:'11px',marginTop:'14px'}}>
+                                    Die Nachteile gehören ins Gespräch. Ein Kunde, der den Wegfall von MagentaEINS erst auf der Rechnung merkt, storniert – und die Provision ist doppelt weg.
+                                </p>
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+                                <button onClick={onClose} style={{padding:'11px 18px',borderRadius:'10px',border:'1.5px solid #e3e3ec',background:'#fff',color:'#4a4a5a',fontWeight:700,fontSize:'14px',cursor:'pointer',fontFamily:'inherit'}}>Schließen</button>
+                                <button onClick={()=>{
+                                    onUebernehmen({
+                                        magenta: mag.name, business: biz.name,
+                                        ist: istV, vvl: vvlV, bizBrutto: bizBrutto,
+                                        vvlGesamt: vvlGesamt, bizGesamt: bizGesamt,
+                                        diff: diff, diffMtl: diffMtl,
+                                        vorsteuer: !!vorsteuer, vorsteuerVorteil: vorsteuerVorteil,
+                                        onlineVorteil: ovV, gutschrift: gsV,
+                                        empfehlung: vTitle
+                                    });
+                                }} style={{padding:'11px 20px',borderRadius:'10px',border:'none',background:M,color:'#fff',fontWeight:800,fontSize:'14px',cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 14px rgba(226,0,116,.3)'}}>Ergebnis übernehmen</button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const SkipReasonModal = ({ isOpen, onClose, onConfirm }) => {
             const [selectedReason, setSelectedReason] = useState('');
             const [customText, setCustomText] = useState('');
@@ -10877,6 +11167,8 @@ const handleOpenStats = () => { setShowPinLock(true); };
             }, [wlanSnapshot, techUebernommen, smartMatchNetBundle]);
             const [showRoamingModal, setShowRoamingModal] = useState(false);
             const [showTvModal, setShowTvModal] = useState(false);
+            const [showBusinessModal, setShowBusinessModal] = useState(false);
+            const [businessSnapshot, setBusinessSnapshot] = useState(null);
             const [showSignatureModal, setShowSignatureModal] = useState(false);
             const [showFinishTypeModal, setShowFinishTypeModal] = useState(false); // NEW MODAL STATE
             
@@ -17725,6 +18017,11 @@ const resumeParkedArchive = async (entry, rufValue) => {
                     <SpeedModal isOpen={showSpeedModal} onClose={() => setShowSpeedModal(false)} triggerToast={triggerToast} onRecommendation={(rec) => setSpeedRecommendation(rec)} />
                     <TechModal isOpen={showTechModal} onClose={() => toggleTech(false)} checkedTechs={checkedTechs} setCheckedTechs={setCheckedTechs} onUebernehmen={(list) => { setTechUebernommen(list); triggerToast('✅ Technologien übernommen!'); }} />
                     <RoamingModal isOpen={showRoamingModal} onClose={() => setShowRoamingModal(false)} />
+                    <BusinessCheckModal isOpen={showBusinessModal} onClose={() => setShowBusinessModal(false)} triggerToast={triggerToast} onUebernehmen={(snap) => {
+                        setBusinessSnapshot(snap);
+                        triggerToast(snap.diff > 0 ? '💼 Business-Check übernommen – Business spart!' : '💼 Business-Check übernommen');
+                        setShowBusinessModal(false);
+                    }} />
                     <TvPriceModal isOpen={showTvModal} onClose={() => setShowTvModal(false)} onUebernehmen={(snap) => { 
     // TV-Paket NICHT in Kosten (Ist) übernehmen – das sind Kundenbestandskosten, nicht neue!
     if (typeof snap === 'object') setTvSnapshot(snap); 
@@ -18107,7 +18404,7 @@ const resumeParkedArchive = async (entry, rufValue) => {
                         setTimeout(() => setShowReferralModal(true), 300);
                     }} />
 
-                    <header className="bg-white px-4 py-2 border-b border-slate-200 flex items-center gap-3 shrink-0 shadow-sm z-30 relative h-16 w-full"><div className="print-hide-toast" style={{display:"flex",alignItems:"center",gap:4,marginRight:4,cursor:"default"}} title="Autosave aktiv – alle 30s gesichert"><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/><span style={{fontSize:9,fontWeight:700,color:"#94a3b8",letterSpacing:"0.04em",userSelect:"none"}}>AUTO</span></div><span style={{fontSize:8,fontWeight:700,color:'#cbd5e1',letterSpacing:'0.05em',userSelect:'none',pointerEvents:'none',marginLeft:'-8px',marginRight:'2px'}}>v53.0</span>{LINK_EMPLOYEE && LINK_EMPLOYEE !== 'Diego da Silva' && <button onClick={() => setShowMyStats(true)} className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors" title="Meine Statistik – Qualität & Vorgänge ansehen"><Icon d={ICONS.Activity} size={18}/></button>}{LINK_EMPLOYEE === 'Diego da Silva' && <button onClick={handleOpenStats} className="p-2 text-slate-400 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors" title="📊 Statistik & Admin"><Icon d={ICONS.Lock} size={18}/></button>}<button onClick={toggleFullScreen} className="p-2 text-slate-400 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors" title="Vollbild umschalten (wie F11)">{isFullscreen ? <Icon d={ICONS.Minimize} size={18}/> : <Icon d={ICONS.Maximize} size={18}/>}</button><button onClick={() => setShowArchivPopup(true)} className="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-colors relative" title={parkedCount > 0 ? `Archiv öffnen – ${parkedCount} geparkte Angebote warten!` : "Archiv öffnen – gespeicherte Pencil Sellings abrufen"}><Icon d={ICONS.Folder} size={18}/>{parkedCount > 0 && <span style={{position:'absolute',top:'0px',right:'0px',minWidth:'15px',height:'15px',padding:'0 3px',borderRadius:'999px',background:'#ef4444',color:'#fff',fontSize:'9px',fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,boxShadow:'0 0 0 2px #fff',pointerEvents:'none'}}>{parkedCount > 9 ? '9+' : parkedCount}</span>}</button>
+                    <header className="bg-white px-4 py-2 border-b border-slate-200 flex items-center gap-3 shrink-0 shadow-sm z-30 relative h-16 w-full"><div className="print-hide-toast" style={{display:"flex",alignItems:"center",gap:4,marginRight:4,cursor:"default"}} title="Autosave aktiv – alle 30s gesichert"><div style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/><span style={{fontSize:9,fontWeight:700,color:"#94a3b8",letterSpacing:"0.04em",userSelect:"none"}}>AUTO</span></div><span style={{fontSize:8,fontWeight:700,color:'#cbd5e1',letterSpacing:'0.05em',userSelect:'none',pointerEvents:'none',marginLeft:'-8px',marginRight:'2px'}}>v54.1</span>{LINK_EMPLOYEE && LINK_EMPLOYEE !== 'Diego da Silva' && <button onClick={() => setShowMyStats(true)} className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors" title="Meine Statistik – Qualität & Vorgänge ansehen"><Icon d={ICONS.Activity} size={18}/></button>}{LINK_EMPLOYEE === 'Diego da Silva' && <button onClick={handleOpenStats} className="p-2 text-slate-400 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors" title="📊 Statistik & Admin"><Icon d={ICONS.Lock} size={18}/></button>}<button onClick={toggleFullScreen} className="p-2 text-slate-400 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors" title="Vollbild umschalten (wie F11)">{isFullscreen ? <Icon d={ICONS.Minimize} size={18}/> : <Icon d={ICONS.Maximize} size={18}/>}</button><button onClick={() => setShowArchivPopup(true)} className="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-colors relative" title={parkedCount > 0 ? `Archiv öffnen – ${parkedCount} geparkte Angebote warten!` : "Archiv öffnen – gespeicherte Pencil Sellings abrufen"}><Icon d={ICONS.Folder} size={18}/>{parkedCount > 0 && <span style={{position:'absolute',top:'0px',right:'0px',minWidth:'15px',height:'15px',padding:'0 3px',borderRadius:'999px',background:'#ef4444',color:'#fff',fontSize:'9px',fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,boxShadow:'0 0 0 2px #fff',pointerEvents:'none'}}>{parkedCount > 9 ? '9+' : parkedCount}</span>}</button>
                     
                     {false && <button onClick={() => setDarkMode(d => !d)} className="dark-toggle-btn" title="Hell/Dunkel umschalten">
                         <div className={`dark-toggle-track ${darkMode ? 'on' : ''}`}><div className="dark-toggle-thumb"></div></div>
@@ -19103,7 +19400,9 @@ const resumeParkedArchive = async (entry, rufValue) => {
                                 </div>
                             </div>
 
-                            {/* KOSTEN (IST) */}
+                            {/* KOSTEN (IST) — v54: ersetzt durch Business Check.
+                                Zum Reaktivieren: SHOW_KOSTEN_IST oben auf true setzen. */}
+                            {SHOW_KOSTEN_IST && (
                             <div className="print-hide-kosten" style={{background:'#ffffff',borderRadius:'12px',border:'1px solid #e8f0fe',boxShadow:'0 1px 3px rgba(37,99,235,0.05)',overflow:'hidden'}}>
                                 <div style={{padding:'10px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                     <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
@@ -19170,6 +19469,49 @@ const resumeParkedArchive = async (entry, rufValue) => {
                                     {totalCost>0&&<span style={{fontSize:'12px',fontWeight:900,color:'#2563eb'}}>{totalCost.toFixed(2).replace('.',',')} €</span>}
                                 </div>
                                 )}
+                            </div>
+                            )}
+
+                            {/* BUSINESS CHECK — eigene Kategorie (Telekom Gewerbe) */}
+                            <div className="print-hide-kosten" style={{background:'#ffffff',borderRadius:'12px',border:'1px solid #f9d3e6',boxShadow:'0 1px 3px rgba(226,0,116,0.06)',overflow:'hidden'}}>
+                                <div style={{padding:'10px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                                        <div style={{width:'22px',height:'22px',borderRadius:'7px',background:'linear-gradient(135deg,#E20074,#a8005a)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                            <Icon d={ICONS.Calculator} size={11} style={{color:'white'}}/>
+                                        </div>
+                                        <span style={{fontSize:'12px',fontWeight:800,color:'#1e293b',letterSpacing:'0.01em'}}>Business Check</span>
+                                    </div>
+                                    {businessSnapshot && (
+                                        <button onClick={()=>setBusinessSnapshot(null)} style={{padding:'2px 8px',borderRadius:'999px',fontSize:'9px',fontWeight:700,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#94a3b8',cursor:'pointer'}}>Zurücksetzen</button>
+                                    )}
+                                </div>
+                                <div style={{padding:'7px 10px',display:'flex',flexDirection:'column',gap:'5px'}}>
+
+                                    <button onClick={()=>setShowBusinessModal(true)}
+                                        style={{width:'100%',display:'flex',alignItems:'center',gap:'9px',padding:'7px 10px',borderRadius:'9px',border:`1.5px solid ${businessSnapshot?'#86efac':'#f1f5f9'}`,background:businessSnapshot?'#f0fdf4':'#fafafa',cursor:'pointer',transition:'all 0.15s',textAlign:'left'}}
+                                        onMouseEnter={e=>{e.currentTarget.style.borderColor=businessSnapshot?'#22c55e':'#E20074';e.currentTarget.style.background=businessSnapshot?'#dcfce7':'#E2007410';}}
+                                        onMouseLeave={e=>{e.currentTarget.style.borderColor=businessSnapshot?'#86efac':'#f1f5f9';e.currentTarget.style.background=businessSnapshot?'#f0fdf4':'#fafafa';}}>
+                                        <div style={{width:'20px',height:'20px',borderRadius:'6px',background:businessSnapshot?'#22c55e':'#E2007415',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                            <Icon d={ICONS.Calculator} size={11} style={{color:businessSnapshot?'#fff':'#E20074'}}/>
+                                        </div>
+                                        <span style={{fontSize:'11px',fontWeight:700,color:businessSnapshot?'#166534':'#374151'}}>
+                                            {businessSnapshot ? 'VVL vs. Business ✓' : 'VVL vs. Business rechnen'}
+                                        </span>
+                                    </button>
+
+                                    {businessSnapshot && (
+                                    <>
+                                        <div style={{fontSize:'10px',fontWeight:700,color:'#64748b',padding:'0 2px'}}>{businessSnapshot.magenta} → {businessSnapshot.business}</div>
+                                        <div style={{padding:'6px 9px',borderRadius:'8px',border:'1px solid '+(businessSnapshot.diff>0?'#b6e2d3':'#f0dcb0'),background:businessSnapshot.diff>0?'#e7f6f0':'#fdf3e0'}}>
+                                            <div style={{fontSize:'9px',fontWeight:900,color:businessSnapshot.diff>0?'#0d7d5a':'#8a5a00',marginBottom:'2px'}}>{businessSnapshot.empfehlung}</div>
+                                            <div style={{fontSize:'13px',fontWeight:900,color:businessSnapshot.diff>0?'#0d7d5a':'#8a5a00'}}>
+                                                {Math.abs(businessSnapshot.diff).toFixed(2).replace('.',',')} € <span style={{fontSize:'9px',fontWeight:700}}>/ 24 Mon.</span>
+                                            </div>
+                                            <div style={{fontSize:'9px',fontWeight:700,color:'#64748b',marginTop:'1px'}}>≈ {Math.abs(businessSnapshot.diffMtl).toFixed(2).replace('.',',')} € pro Monat</div>
+                                        </div>
+                                    </>
+                                    )}
+                                </div>
                             </div>
 
                             </div>
