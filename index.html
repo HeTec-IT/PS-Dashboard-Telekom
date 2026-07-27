@@ -16356,9 +16356,19 @@ const redrawCanvas = (canvas, strokes, scaleFactor = 1, key = '') => {
       ctx.globalCompositeOperation = 'source-over';
     }
     if (stroke.points.length > 0) {
+      // v74.2 FIX: Auch cost_-Felder (Einmalig / 1. Jahr / 2. Jahr / Agent / Datum)
+      // müssen ihre Koordinaten auf die AKTUELLE Feldbreite umrechnen. Vorher lief
+      // responsiveScaleFactor=1 fix → beim Drehen ins Hochformat wird das Feld
+      // schmaler, die 1:1 übernommenen Punkte lagen dann verschoben ("wandern").
+      // Lösung wie bei offer: uniform auf aktuelleBreite/baseWidth skalieren (X=Y,
+      // keine Verzerrung), nie vergrößern (Deckel bei 1).
+      const costUniform = isCostKey ? Math.min(1, Math.max(0.05, currentCssWidth / (stroke.baseWidth || currentCssWidth))) : null;
       const pts = isOfferKey && offerScaleX != null ? stroke.points.map(p => ({
         x: p.x * offerScaleX,
         y: p.y * offerScaleY
+      })) : isCostKey && costUniform != null ? stroke.points.map(p => ({
+        x: p.x * costUniform,
+        y: p.y * costUniform
       })) : stroke.points.map(p => ({
         x: p.x * responsiveScaleFactor,
         y: p.y * responsiveScaleFactor
@@ -18966,11 +18976,13 @@ function App() {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
+      // v74.1 FIX: NUR die 2.-Jahr-Strokes auf diesen Canvas (offerCost3Ref) zeichnen.
+      // Der frühere zweite Aufruf mit 'cost_smartphone' lief auf DENSELBEN Canvas und
+      // rief intern clearRect auf → er löschte die gerade gezeichneten 2.-Jahr-Striche
+      // wieder weg. Das Smartphone-Feld hat seinen EIGENEN Canvas (offerCostSmartphoneRef)
+      // und wird dort separat gezeichnet – hier hat es nichts verloren.
       try {
         redrawCanvas(canvas, drawnStrokes['cost_monatlich2'], 1, 'cost_monatlich2');
-      } catch (e) {}
-      try {
-        redrawCanvas(canvas, drawnStrokes['cost_smartphone'], 1, 'cost_smartphone');
       } catch (e) {}
     };
 
