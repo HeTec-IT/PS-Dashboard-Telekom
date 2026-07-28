@@ -4416,6 +4416,7 @@ const ICONS = {
   Clipboard: '<rect x="9" y="4" width="6" height="6" rx="1"/><path d="M15 8h.01"/><path d="M15 12h.01"/><path d="M15 16h.01"/><path d="M9 8h.01"/><path d="M9 12h.01"/><path d="M9 16h.01"/><rect x="3" y="2" width="18" height="20" rx="2"/>',
   Sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   Users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  ShieldCheck: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
   Maximize: '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
   Minimize: '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
   ZoomIn: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>',
@@ -6483,6 +6484,375 @@ const FolgeterminModal = ({
     }
   }, "Überspringen"))));
 };
+// ============================================================
+// ASONA myPROTECT – Verkaufshilfe (Telekom-Edition)
+// Eigenständige Komponente, React.createElement-Form (kein Babel zur Laufzeit).
+// Alle Preise/Konditionen zentral in ASONA_KONFIG.
+// ============================================================
+const ASONA_KONFIG = {
+  stufen: [
+    { bis: 400,  monat: 5.49,  jahr: 54.99,  sb: 29, zuschuss: 200  },
+    { bis: 600,  monat: 6.99,  jahr: 74.99,  sb: 39, zuschuss: 250  },
+    { bis: 900,  monat: 9.99,  jahr: 109.99, sb: 49, zuschuss: 375  },
+    { bis: 1200, monat: 11.49, jahr: 124.99, sb: 69, zuschuss: 500  },
+    { bis: 1500, monat: 13.49, jahr: 149.99, sb: 79, zuschuss: 600  },
+    { bis: 2500, monat: 15.49, jahr: 169.99, sb: 99, zuschuss: 1000 }
+  ],
+  plusMonat: 3.00, plusJahr: 36.00,
+  displayMonat: -1.00, displayJahr: -12.00,
+  reparatur: {
+    display: [
+      { bis: 400, kosten: 130 }, { bis: 600, kosten: 190 }, { bis: 900, kosten: 260 },
+      { bis: 1200, kosten: 320 }, { bis: 1500, kosten: 390 }, { bis: 2500, kosten: 450 }
+    ],
+    wasser: [
+      { bis: 400, kosten: 160 }, { bis: 600, kosten: 230 }, { bis: 900, kosten: 320 },
+      { bis: 1200, kosten: 420 }, { bis: 1500, kosten: 520 }, { bis: 2500, kosten: 640 }
+    ]
+  },
+  quickPrices: [400, 700, 900, 1200, 1500]
+};
+
+function asonaEur(n, dec) {
+  if (dec === undefined) dec = 2;
+  return n.toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' €';
+}
+function asonaStufe(price) {
+  for (let i = 0; i < ASONA_KONFIG.stufen.length; i++) { if (price <= ASONA_KONFIG.stufen[i].bis) return ASONA_KONFIG.stufen[i]; }
+  return ASONA_KONFIG.stufen[ASONA_KONFIG.stufen.length - 1];
+}
+function asonaKosten(tab, price) {
+  for (let i = 0; i < tab.length; i++) { if (price <= tab[i].bis) return tab[i].kosten; }
+  return tab[tab.length - 1].kosten;
+}
+
+// Große Szenen-Illustrationen (dangerouslySetInnerHTML)
+const ASONA_SCENES = {
+  drop: '<svg width="100%" height="150" viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="agDrop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FDE7E5"/><stop offset="1" stop-color="#FBD5D0"/></linearGradient></defs><rect width="300" height="150" fill="url(#agDrop)"/><line x1="0" y1="120" x2="300" y2="120" stroke="#E8A8A0" stroke-width="2"/><path d="M150 22 v14 M132 30 v10 M168 30 v10" stroke="#D92D20" stroke-width="2.5" stroke-linecap="round" opacity=".5"/><g transform="rotate(24 150 88)"><rect x="128" y="52" width="44" height="74" rx="7" fill="#fff" stroke="#1A1A2E" stroke-width="2.5"/><path d="M138 66 l10 12 l-6 8 l12 10 M150 62 l-4 20" stroke="#D92D20" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="150" cy="118" r="2.4" fill="#1A1A2E"/></g><path d="M110 118 l3 -6 l3 6 l6 3 l-6 3 l-3 6 l-3 -6 l-6 -3 z" fill="#D92D20" opacity=".8"/></svg>',
+  child: '<svg width="100%" height="150" viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="agChild" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FDE7E5"/><stop offset="1" stop-color="#FBD5D0"/></linearGradient></defs><rect width="300" height="150" fill="url(#agChild)"/><line x1="0" y1="128" x2="300" y2="128" stroke="#E8A8A0" stroke-width="2"/><g stroke="#1A1A2E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="118" cy="54" r="18" fill="#fff"/><path d="M112 38 q6 -8 12 -1" fill="none" stroke="#E20074"/><path d="M118 72 q-14 4 -14 22 q0 8 4 14 h20 q4 -6 4 -14 q0 -18 -14 -22 Z" fill="#fff"/><path d="M107 82 l-16 -12 M129 82 l16 -8" fill="none"/><circle cx="90" cy="69" r="3" fill="#fff"/><circle cx="146" cy="73" r="3" fill="#fff"/><path d="M112 108 v14 M124 108 v14" fill="none"/><circle cx="112" cy="52" r="1.8" fill="#1A1A2E"/><circle cx="124" cy="52" r="1.8" fill="#1A1A2E"/><path d="M114 60 q4 3 8 0" fill="none" stroke-width="1.8"/></g><g transform="rotate(-20 178 80)"><rect x="166" y="60" width="28" height="48" rx="5" fill="#fff" stroke="#1A1A2E" stroke-width="2.5"/><path d="M172 76 l7 8 l-4 6" stroke="#D92D20" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M184 46 v9 M198 52 v8" stroke="#D92D20" stroke-width="2.5" stroke-linecap="round" opacity=".5"/></svg>',
+  water: '<svg width="100%" height="150" viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="agWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4F0FB"/><stop offset="1" stop-color="#CFE4F7"/></linearGradient></defs><rect width="300" height="150" fill="url(#agWater)"/><path d="M0 96 q25 -8 50 0 t50 0 t50 0 t50 0 t50 0 v54 H0 Z" fill="#7FB5E6" opacity=".55"/><path d="M0 104 q25 -8 50 0 t50 0 t50 0 t50 0 t50 0" stroke="#4A90D9" stroke-width="2" fill="none" opacity=".6"/><g transform="rotate(12 150 82)"><rect x="128" y="46" width="44" height="72" rx="7" fill="#fff" stroke="#1A1A2E" stroke-width="2.5"/><rect x="134" y="54" width="32" height="40" rx="3" fill="#CFE4F7"/></g><g fill="#4A90D9"><circle cx="110" cy="70" r="4"/><circle cx="196" cy="64" r="5"/><circle cx="120" cy="52" r="3"/><circle cx="186" cy="82" r="3"/></g><path d="M100 60 q4 -10 8 0 q-4 8 -8 0 Z" fill="#4A90D9"/><path d="M200 78 q4 -10 8 0 q-4 8 -8 0 Z" fill="#4A90D9"/></svg>',
+  broken: '<svg width="100%" height="150" viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="agBroken" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FDECC8"/><stop offset="1" stop-color="#FADFA6"/></linearGradient></defs><rect width="300" height="150" fill="url(#agBroken)"/><line x1="0" y1="122" x2="300" y2="122" stroke="#E0C078" stroke-width="2"/><g stroke="#1A1A2E" stroke-width="2.5" stroke-linejoin="round"><path d="M120 50 l30 4 l-4 30 l-32 -6 Z" fill="#fff"/><path d="M150 56 l30 -4 l6 34 l-32 4 Z" fill="#fff"/><path d="M128 58 l12 10 M132 76 l10 -6 M162 62 l10 8 M168 80 l8 -8" stroke="#B7791F" stroke-width="1.6" fill="none" stroke-linecap="round"/></g><g fill="#B7791F"><path d="M104 96 l6 2 l-3 5 Z"/><path d="M196 98 l6 -2 l1 6 Z"/><path d="M150 100 l5 4 l-6 2 Z"/></g><path d="M150 34 v-8 M122 40 l-6 -6 M180 40 l6 -6" stroke="#D92D20" stroke-width="2.5" stroke-linecap="round" opacity=".55"/></svg>',
+  theft: '<svg width="100%" height="150" viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="agTheft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E9F5"/><stop offset="1" stop-color="#D3D8ED"/></linearGradient></defs><rect width="300" height="150" fill="url(#agTheft)"/><g transform="rotate(-8 128 84)"><rect x="104" y="50" width="44" height="72" rx="8" fill="#fff" stroke="#1A1A2E" stroke-width="2.5"/><rect x="110" y="58" width="32" height="48" rx="3" fill="#E6E9F5"/><circle cx="126" cy="114" r="2.2" fill="#1A1A2E"/></g><g stroke="#1A1A2E" stroke-width="2.5" fill="#fff" stroke-linejoin="round" stroke-linecap="round"><path d="M232 96 q-6 -22 6 -34 l24 4 q6 18 -2 34 Z"/><path d="M186 70 q-8 0 -10 6 q2 6 10 6" fill="none"/><path d="M184 82 q-10 0 -12 6 q2 6 12 6" fill="none"/><path d="M186 94 q-8 0 -10 6 q2 5 10 5" fill="none"/><path d="M196 64 q-6 -4 -12 -1" fill="none"/></g><path d="M92 62 h-20 M90 76 h-26 M92 90 h-18" stroke="#D92D20" stroke-width="2.5" stroke-linecap="round" opacity=".5"/></svg>'
+};
+
+const ASONA_MINI = {
+  display: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 6l4 5-3 3 4 4"/></svg>',
+  fall: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="14" rx="2" transform="rotate(16 12 11)"/><path d="M5 21l3-2M19 21l-2-2"/></svg>',
+  water: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9z"/></svg>',
+  battery: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2M11 9l-2 3h3l-2 3"/></svg>',
+  plug: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0z M12 17v5"/></svg>',
+  camera: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M7 6l1.5-2h7L17 6"/></svg>',
+  chip: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>',
+  theft: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E20074" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 3v6c0 5-3 8-7 9-4-1-7-4-7-9V5z"/><path d="M9 12l2 2 4-4"/></svg>'
+};
+
+const ASONA_SZENARIEN = [
+  { scene: 'drop',   tag: 'Displaybruch',         titel: 'Runtergefallen',            typ: 'display' },
+  { scene: 'child',  tag: 'Displaybruch',         titel: 'Das Kind lässt es fallen',  typ: 'display' },
+  { scene: 'water',  tag: 'Wasserschaden',        titel: 'Ab ins Klo',                typ: 'wasser'  },
+  { scene: 'broken', tag: 'Totalschaden',         titel: 'Einfach kaputt',            typ: 'total'   },
+  { scene: 'theft',  tag: 'Diebstahl · mit PLUS', titel: 'Unterwegs geklaut',         typ: 'theft'   }
+];
+
+const ASONA_SCHADEN = [
+  { ico: 'display', name: 'Displaybruch', badge: 'haupt', badgeTxt: '50–70 % aller Schäden', ex: 'Risse im Display oder Glas nach Sturz auf Fliesen, Asphalt oder Beton.' },
+  { ico: 'fall',    name: 'Sturzschäden', ex: 'Gehäuse verbogen, Rückseite beschädigt, interne Defekte nach einem Fall.' },
+  { ico: 'water',   name: 'Flüssigkeitsschäden', ex: 'Toilette, Waschbecken, Pool – oder Kaffee, Cola, Bier, Regen und Feuchtigkeit.' },
+  { ico: 'battery', name: 'Akkuschäden', ex: 'Akku lädt nicht mehr, ist aufgebläht oder überhitzt stark.' },
+  { ico: 'plug',    name: 'Defekte Ladebuchse & Anschlüsse', ex: 'Durch Verschleiß, Fremdkörper oder Feuchtigkeit.' },
+  { ico: 'camera',  name: 'Kameraschäden', ex: 'Gesprungene Kameralinse, Autofokus funktioniert nicht mehr.' },
+  { ico: 'chip',    name: 'Software- & Elektronikdefekte', ex: 'Mainboard defekt, Gerät startet nicht mehr.' },
+  { ico: 'theft',   name: 'Diebstahl & Raub', badge: 'plus', badgeTxt: 'mit PLUS', ex: 'Taschendiebstahl und Einbruchdiebstahl – separat mit myProtectPLUS.' }
+];
+
+const ASONA_URSACHEN = [
+  'Handy fällt aus der Hosentasche', 'Rutscht vom Tisch oder Sofa',
+  'Sturz beim Sport oder Fahrradfahren', 'Im Auto vergessen und beschädigt',
+  'Kind lässt das Smartphone fallen', 'Getränk übers Handy geschüttet'
+];
+
+const AsonaModal = ({ isOpen, onClose }) => {
+  const h = React.createElement;
+  const [tab, setTab] = React.useState('scen');
+  const [price, setPrice] = React.useState(900);
+  const [service, setService] = React.useState('repair'); // repair | exchange
+  const [optPlus, setOptPlus] = React.useState(false);
+  const [optDisplay, setOptDisplay] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) { setTab('scen'); }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const p = (typeof price === 'number' && price >= 0) ? price : 0;
+  const st = asonaStufe(p);
+  let monat = st.monat + (optPlus ? ASONA_KONFIG.plusMonat : 0) + (optDisplay ? ASONA_KONFIG.displayMonat : 0);
+  let jahr = st.jahr + (optPlus ? ASONA_KONFIG.plusJahr : 0) + (optDisplay ? ASONA_KONFIG.displayJahr : 0);
+  const repDisplay = asonaKosten(ASONA_KONFIG.reparatur.display, p);
+
+  // ---- Tab-Button ----
+  const tabBtn = (id, label) => h('button', {
+    key: id, onClick: () => setTab(id),
+    style: {
+      border: 'none', background: 'transparent', padding: '12px 16px 13px',
+      fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+      color: tab === id ? '#E20074' : '#64748b',
+      borderBottom: tab === id ? '3px solid #E20074' : '3px solid transparent',
+      whiteSpace: 'nowrap'
+    }
+  }, label);
+
+  // ---- Szenarien-Panel ----
+  const scenCard = (sc) => {
+    let without, withIns;
+    if (sc.typ === 'theft') { without = p; withIns = Math.max(0, p - st.zuschuss); }
+    else if (sc.typ === 'total') { without = p; withIns = st.sb; }
+    else { without = asonaKosten(ASONA_KONFIG.reparatur[sc.typ], p); withIns = st.sb; }
+    return h('div', { key: sc.scene, style: { background: '#fff', border: '1px solid #E4E4EC', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,26,46,.06)', display: 'flex', flexDirection: 'column' } },
+      h('div', { style: { position: 'relative', height: '150px' } },
+        h('span', { style: { position: 'absolute', top: '12px', left: '12px', zIndex: 3, background: 'rgba(255,255,255,.92)', color: '#1A1A2E', fontSize: '12px', fontWeight: 700, padding: '5px 11px', borderRadius: '999px', boxShadow: '0 2px 8px rgba(0,0,0,.08)' } }, sc.tag),
+        h('div', { dangerouslySetInnerHTML: { __html: ASONA_SCENES[sc.scene] } })
+      ),
+      h('div', { style: { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1 } },
+        h('h4', { style: { margin: '0 0 12px', fontSize: '17px', fontWeight: 800, color: '#1A1A2E', lineHeight: 1.25 } }, sc.titel),
+        h('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '8px', marginTop: 'auto' } },
+          h('div', { style: { textAlign: 'center', padding: '10px 6px', borderRadius: '12px', background: '#FDE7E5' } },
+            h('div', { style: { fontSize: '10px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: '2px', color: '#D92D20' } }, 'Ohne'),
+            h('div', { style: { fontSize: '26px', fontWeight: 800, lineHeight: 1, color: '#D92D20' } }, asonaEur(without, 0))
+          ),
+          h('div', { style: { width: '30px', height: '30px', borderRadius: '50%', background: '#1A1A2E', color: '#fff', fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, '→'),
+          h('div', { style: { textAlign: 'center', padding: '10px 6px', borderRadius: '12px', background: '#E4F6EC' } },
+            h('div', { style: { fontSize: '10px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: '2px', color: '#12A150' } }, 'Mit Schutz'),
+            h('div', { style: { fontSize: '26px', fontWeight: 800, lineHeight: 1, color: '#12A150' } }, asonaEur(withIns, 0))
+          )
+        )
+      )
+    );
+  };
+
+  const coverItem = (d) => h('div', { key: d.ico, style: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '11px 0', borderBottom: '1px solid #E4E4EC' } },
+    h('div', { style: { flex: '0 0 auto', width: '38px', height: '38px', background: '#FCE6F1', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px' }, dangerouslySetInnerHTML: { __html: ASONA_MINI[d.ico] } }),
+    h('div', { style: { flex: 1, minWidth: 0 } },
+      h('div', { style: { fontSize: '15px', fontWeight: 700, color: '#1A1A2E', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+        d.name,
+        d.badge ? h('span', { style: { fontSize: '10px', fontWeight: 800, background: d.badge === 'plus' ? '#FCE6F1' : '#E20074', color: d.badge === 'plus' ? '#B0005B' : '#fff', padding: '2px 7px', borderRadius: '999px', textTransform: 'uppercase' } }, d.badgeTxt) : null
+      ),
+      h('div', { style: { fontSize: '12.5px', color: '#64748b', marginTop: '2px', lineHeight: 1.4 } }, d.ex)
+    )
+  );
+
+  const scenPanel = h('div', { style: { padding: '20px 22px 26px' } },
+    h('p', { style: { fontSize: '15px', color: '#64748b', margin: '0 0 18px', lineHeight: 1.5 } },
+      h('b', { style: { color: '#1A1A2E' } }, 'Passiert schneller, als man denkt.'), ' Ein Moment – und ohne Schutz wird\u2019s teuer:'),
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' } }, ASONA_SZENARIEN.map(scenCard)),
+    // Vollständige Übersicht
+    h('div', { style: { marginTop: '26px', background: '#fff', border: '1px solid #E4E4EC', borderRadius: '16px', padding: '22px', boxShadow: '0 4px 20px rgba(26,26,46,.06)' } },
+      h('h3', { style: { margin: '0 0 3px', fontSize: '18px', fontWeight: 800, color: '#1A1A2E' } }, 'Das ist alles abgesichert'),
+      h('p', { style: { margin: '0 0 16px', fontSize: '14px', color: '#64748b' } }, 'Von der häufigsten Bagatelle bis zum Totalschaden'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2px 22px' } }, ASONA_SCHADEN.map(coverItem)),
+      h('div', { style: { marginTop: '20px', background: '#F4F4F8', borderRadius: '12px', padding: '16px 18px' } },
+        h('div', { style: { fontSize: '15px', fontWeight: 800, color: '#1A1A2E', marginBottom: '10px' } }, 'Die häufigsten Ursachen im Alltag'),
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px 20px' } },
+          ASONA_URSACHEN.map((u, i) => h('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '9px', fontSize: '14px', color: '#64748b', lineHeight: 1.35 } },
+            h('span', { style: { flex: '0 0 auto', width: '7px', height: '7px', borderRadius: '50%', background: '#E20074' } }), u))
+        )
+      )
+    )
+  );
+
+  // ---- Rechner-Panel ----
+  const optSwitch = (checked, setter) => h('label', { style: { position: 'relative', width: '52px', height: '30px', flex: '0 0 auto', cursor: 'pointer', display: 'inline-block' } },
+    h('span', {
+      onClick: () => setter(!checked),
+      style: { position: 'absolute', inset: 0, background: checked ? '#E20074' : '#CFCFDA', borderRadius: '999px', transition: '.2s' }
+    }),
+    h('span', { onClick: () => setter(!checked), style: { position: 'absolute', height: '24px', width: '24px', left: checked ? '25px' : '3px', top: '3px', background: '#fff', borderRadius: '50%', transition: '.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' } })
+  );
+
+  const svcBtn = (id, title, desc) => h('button', {
+    onClick: () => setService(id),
+    style: { border: service === id ? '2px solid #E20074' : '2px solid #E4E4EC', background: service === id ? '#FCE6F1' : '#fff', borderRadius: '14px', padding: '14px', cursor: 'pointer', textAlign: 'left' }
+  },
+    h('div', { style: { fontSize: '15px', fontWeight: 700, marginBottom: '3px', color: '#1A1A2E' } }, title),
+    h('div', { style: { fontSize: '12px', color: '#64748b', lineHeight: 1.35 } }, desc)
+  );
+
+  const calcPanel = h('div', { style: { padding: '24px 22px 26px' } },
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '22px' } },
+      // Steuerung
+      h('div', { style: { background: '#fff', border: '1px solid #E4E4EC', borderRadius: '16px', padding: '22px', boxShadow: '0 4px 20px rgba(26,26,46,.06)' } },
+        h('p', { style: { fontSize: '14px', fontWeight: 700, margin: '0 0 10px', color: '#1A1A2E' } }, 'Verkaufspreis des Geräts'),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid #E4E4EC', borderRadius: '14px', padding: '4px 16px 4px 4px' } },
+          h('input', {
+            type: 'number', inputMode: 'numeric', value: price, min: 0, step: 10,
+            onChange: (e) => { const v = parseFloat(e.target.value); setPrice(isNaN(v) ? 0 : v); },
+            style: { border: 'none', outline: 'none', background: 'transparent', fontSize: '30px', fontWeight: 800, color: '#1A1A2E', width: '100%', padding: '12px' }
+          }),
+          h('span', { style: { fontSize: '24px', fontWeight: 700, color: '#64748b' } }, '€')
+        ),
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' } },
+          ASONA_KONFIG.quickPrices.map(q => h('button', {
+            key: q, onClick: () => setPrice(q),
+            style: { border: p === q ? '1.5px solid #E20074' : '1.5px solid #E4E4EC', background: p === q ? '#FCE6F1' : '#fff', color: p === q ? '#E20074' : '#64748b', borderRadius: '999px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }
+          }, q + ' €'))
+        ),
+        h('p', { style: { fontSize: '14px', fontWeight: 700, margin: '22px 0 10px', color: '#1A1A2E' } }, 'Service-Variante'),
+        h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+          svcBtn('repair', 'Reparaturservice', 'Neue & gebrauchte Geräte · Reparatur + Neukaufzuschuss'),
+          svcBtn('exchange', '24-Std-Austausch', 'Nur neue Geräte · Ersatzgerät meist am Folgetag')
+        ),
+        h('p', { style: { fontSize: '14px', fontWeight: 700, margin: '22px 0 4px', color: '#1A1A2E' } }, 'Optionen'),
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid #E4E4EC' } },
+          h('div', null,
+            h('div', { style: { fontSize: '15px', fontWeight: 600, color: '#1A1A2E' } }, 'myProtectPLUS'),
+            h('div', { style: { fontSize: '12px', color: '#64748b', marginTop: '2px' } }, 'Zusätzlich Einbruchdiebstahl, Raub & Plünderung')
+          ),
+          h('span', { style: { fontSize: '14px', fontWeight: 700, marginRight: '12px', color: '#1A1A2E', whiteSpace: 'nowrap' } }, '+ 3,00 €'),
+          optSwitch(optPlus, setOptPlus)
+        ),
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' } },
+          h('div', null,
+            h('div', { style: { fontSize: '15px', fontWeight: 600, color: '#1A1A2E' } }, 'Displayschutz-Rabatt'),
+            h('div', { style: { fontSize: '12px', color: '#64748b', marginTop: '2px' } }, 'Bei Panzerglas ab Härte H9')
+          ),
+          h('span', { style: { fontSize: '14px', fontWeight: 700, marginRight: '12px', color: '#12A150', whiteSpace: 'nowrap' } }, '− 1,00 €'),
+          optSwitch(optDisplay, setOptDisplay)
+        )
+      ),
+      // Ergebnis
+      h('div', { style: { background: 'linear-gradient(160deg,#1A1A2E 0%,#2A2A44 100%)', color: '#fff', borderRadius: '16px', padding: '26px', boxShadow: '0 12px 48px rgba(26,26,46,.16)', display: 'flex', flexDirection: 'column' } },
+        h('div', { style: { fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,.7)', marginBottom: '4px' } }, 'Preisstufe bis ' + asonaEur(st.bis, 0)),
+        h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '2px' } },
+          h('span', { style: { fontSize: '48px', fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em' } }, monat.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+          h('span', { style: { fontSize: '17px', color: 'rgba(255,255,255,.75)', fontWeight: 600 } }, '€ / Monat')
+        ),
+        h('div', { style: { fontSize: '14px', color: 'rgba(255,255,255,.7)', marginBottom: '22px' } }, 'oder einmalig ', h('b', { style: { color: '#fff' } }, asonaEur(jahr)), ' für 1 Jahr'),
+        h('div', { style: { borderTop: '1px solid rgba(255,255,255,.15)', margin: '4px 0 18px' } }),
+        h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0' } },
+          h('span', { style: { fontSize: '14px', color: 'rgba(255,255,255,.8)' } }, 'Selbstbeteiligung im Schadensfall'),
+          h('span', { style: { fontSize: '19px', fontWeight: 700 } }, asonaEur(st.sb, 0))
+        ),
+        service === 'repair' ? h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderTop: '1px solid rgba(255,255,255,.1)' } },
+          h('span', { style: { fontSize: '14px', color: 'rgba(255,255,255,.8)' } }, 'Neukaufzuschuss bei Totalschaden/Diebstahl'),
+          h('span', { style: { fontSize: '19px', fontWeight: 700 } }, asonaEur(st.zuschuss, 0))
+        ) : null,
+        h('div', { style: { marginTop: '18px', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: '14px', padding: '16px' } },
+          h('div', { style: { fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,.85)', marginBottom: '10px' } }, 'Beispiel Displaybruch – was zahlt der Kunde?'),
+          h('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '10px', alignItems: 'center' } },
+            h('div', { style: { textAlign: 'center' } },
+              h('div', { style: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: '3px', color: '#FF9B8F' } }, 'Ohne Schutz'),
+              h('div', { style: { fontSize: '22px', fontWeight: 800, color: '#FF9B8F' } }, '≈ ' + asonaEur(repDisplay, 0))
+            ),
+            h('div', { style: { fontSize: '20px', color: 'rgba(255,255,255,.4)', textAlign: 'center' } }, '›'),
+            h('div', { style: { textAlign: 'center' } },
+              h('div', { style: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: '3px', color: '#7DE0A3' } }, 'Mit myProtect'),
+              h('div', { style: { fontSize: '22px', fontWeight: 800, color: '#7DE0A3' } }, asonaEur(st.sb, 0))
+            )
+          )
+        ),
+        h('div', { style: { marginTop: '18px', fontSize: '12px', color: 'rgba(255,255,255,.55)', lineHeight: 1.4 } },
+          service === 'exchange'
+            ? 'Nur für neue Geräte. Im Schadensfall wird der Auftrag innerhalb von 24 Stunden ausgelöst – das Ersatzgerät kommt meist schon am Folgetag.'
+            : 'Neue & gebrauchte Geräte. Im Reparaturfall zahlt der Kunde nur den Selbstbehalt. Bei Totalschaden oder Diebstahl gibt es den Neukaufzuschuss.'
+        )
+      )
+    )
+  );
+
+  // ---- Leistungen-Panel ----
+  const FEAT = [
+    { name: 'Ersatzgerät bei Schaden/Diebstahl', ex: true, rp: false },
+    { name: 'Schäden nach Herstellergarantie (Material, Konstruktion, Montage)', ex: true, rp: true },
+    { name: 'Unfall: Sturz-, Bruch- & Flüssigkeitsschäden', ex: true, rp: true },
+    { name: 'Defekte durch Bedienungsfehler', ex: true, rp: true },
+    { name: 'Brand, Blitzschlag, Explosion & Implosion', ex: true, rp: true },
+    { name: 'Vorsätzliche Beschädigung durch Dritte, Sabotage, Vandalismus', ex: true, rp: true }
+  ];
+  const featRow = (f, i) => h('div', { key: i, style: { display: 'grid', gridTemplateColumns: '1fr 96px 96px', padding: '15px 20px', borderTop: '1px solid #E4E4EC', alignItems: 'center', fontSize: '14px' } },
+    h('div', { style: { color: '#1A1A2E', lineHeight: 1.4, paddingRight: '12px' } }, f.name),
+    h('div', { style: { textAlign: 'center' } }, h('span', { style: { color: f.ex ? '#12A150' : '#D92D20', fontWeight: 800, fontSize: '18px' } }, f.ex ? '✓' : '✕')),
+    h('div', { style: { textAlign: 'center' } }, h('span', { style: { color: f.rp ? '#12A150' : '#D92D20', fontWeight: 800, fontSize: '18px' } }, f.rp ? '✓' : '✕'))
+  );
+  const featPanel = h('div', { style: { padding: '24px 22px 26px' } },
+    h('div', { style: { background: '#fff', border: '1px solid #E4E4EC', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,26,46,.06)' } },
+      h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 96px 96px', background: '#F4F4F8', padding: '16px 20px', fontSize: '12.5px', fontWeight: 700, color: '#64748b', alignItems: 'center' } },
+        h('div', null, 'Leistung'),
+        h('div', { style: { textAlign: 'center' } }, '24-Std-Austausch'),
+        h('div', { style: { textAlign: 'center' } }, 'Reparaturservice')
+      ),
+      FEAT.map(featRow),
+      h('div', { style: { padding: '16px 20px', fontSize: '13px', color: '#64748b', background: '#F4F4F8', lineHeight: 1.5 } },
+        'Abschließbar bis ', h('b', null, '7 Tage'), ' nach dem Kauf. Der 24-Stunden-Austauschservice ist exklusiv für neue Geräte; der Reparaturservice gilt auch für gebrauchte Geräte.')
+    ),
+    h('div', { style: { marginTop: '16px', background: '#FCE6F1', border: '1px solid #F3C6DF', borderRadius: '12px', padding: '16px 18px', fontSize: '14px', color: '#1A1A2E', lineHeight: 1.5 } },
+      h('b', { style: { color: '#B0005B' } }, 'Das PLUS an Sicherheit:'), ' Mit der optionalen Variante myProtectPLUS ist der Kunde zusätzlich bei Einbruchdiebstahl, Raub und Plünderung abgesichert – für 3,00 € mehr im Monat.')
+  );
+
+  return h('div', {
+    className: 'no-print',
+    onClick: (e) => { if (e.target === e.currentTarget) onClose(); },
+    style: { position: 'fixed', inset: 0, zIndex: 10700, background: 'rgba(20,20,35,.55)', backdropFilter: 'blur(3px)', display: 'block', padding: '20px', overflowY: 'auto' }
+  },
+    h('div', { style: { maxWidth: '940px', margin: '24px auto', background: '#F4F4F8', borderRadius: '22px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden' } },
+      // Kopf
+      h('div', { style: { background: '#fff', padding: '22px 26px 20px', borderBottom: '1px solid #E4E4EC', position: 'relative' } },
+        h('span', { style: { display: 'inline-flex', alignItems: 'baseline', gap: '2px', fontSize: '22px', fontWeight: 800, letterSpacing: '-.02em' } },
+          h('span', { style: { background: '#1A1A2E', color: '#fff', padding: '2px 7px', borderRadius: '6px', fontWeight: 700 } }, 'my'),
+          h('span', { style: { color: '#1A1A2E' } }, 'Protect')
+        ),
+        h('button', { onClick: onClose, 'aria-label': 'Schließen', style: { position: 'absolute', top: '18px', right: '18px', width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #E4E4EC', background: '#fff', fontSize: '22px', color: '#64748b', cursor: 'pointer', lineHeight: 1 } }, '×'),
+        h('p', { style: { margin: '8px 0 0', color: '#64748b', fontSize: '15px', maxWidth: '640px' } }, 'Ein kleiner Beitrag im Monat – und im Schadensfall zahlt der Kunde nur einen geringen Selbstbehalt statt des vollen Neupreises.')
+      ),
+      // Tabs
+      h('div', { style: { display: 'flex', gap: '6px', padding: '10px 26px 0', background: '#fff', overflowX: 'auto' } },
+        tabBtn('scen', 'Alltag & Beispiele'), tabBtn('calc', 'Beitrags-Rechner'), tabBtn('feat', 'Leistungen')
+      ),
+      // Panel
+      tab === 'scen' ? scenPanel : (tab === 'calc' ? calcPanel : featPanel),
+      // Fuß
+      h('div', { style: { background: '#fff', borderTop: '1px solid #E4E4EC', padding: '16px 26px', display: 'flex', gap: '12px', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' } },
+        h('button', { onClick: onClose, style: { border: 'none', borderRadius: '12px', padding: '14px 22px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: '#E20074', color: '#fff' } }, 'Schließen')
+      )
+    )
+  );
+};
+
+// ---- Reminder nach Abschluss: "Wurde ein Smartphone/Tablet verkauft?" ----
+const AsonaReminder = ({ isOpen, onJa, onNein }) => {
+  const h = React.createElement;
+  if (!isOpen) return null;
+  return h('div', {
+    className: 'no-print',
+    style: { position: 'fixed', inset: 0, zIndex: 10690, background: 'rgba(20,20,35,.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  },
+    h('div', { style: { background: '#fff', width: '100%', maxWidth: '420px', borderRadius: '20px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden' } },
+      h('div', { style: { background: 'linear-gradient(135deg,#E20074,#B0005B)', padding: '22px', textAlign: 'center' } },
+        h('div', { style: { width: '48px', height: '48px', margin: '0 auto 10px', background: 'rgba(255,255,255,.2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+          dangerouslySetInnerHTML: { __html: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>' } }),
+        h('h4', { style: { fontSize: '19px', fontWeight: 900, color: '#fff', margin: 0 } }, 'Asona myProtect anbieten?'),
+        h('p', { style: { fontSize: '12.5px', color: 'rgba(255,255,255,.85)', marginTop: '5px', marginBottom: 0 } }, 'Wurde ein Smartphone oder Tablet verkauft?')
+      ),
+      h('div', { style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '11px' } },
+        h('button', { onClick: onJa, style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', borderRadius: '14px', border: '2px solid #F3C6DF', background: 'linear-gradient(135deg,#FCE6F1,#F9D5E8)', cursor: 'pointer', textAlign: 'left', width: '100%' } },
+          h('div', { style: { width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg,#E20074,#B0005B)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 } }, '📱'),
+          h('div', null,
+            h('div', { style: { fontSize: '15px', fontWeight: 800, color: '#1A1A2E' } }, 'Ja – Geräteschutz zeigen'),
+            h('div', { style: { fontSize: '12px', color: '#64748b', marginTop: '2px' } }, 'Vorteile & Beitrag dem Kunden zeigen')
+          )
+        ),
+        h('button', { onClick: onNein, style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', borderRadius: '14px', border: '2px solid #E4E4EC', background: '#F8FAFC', cursor: 'pointer', textAlign: 'left', width: '100%' } },
+          h('div', { style: { width: '44px', height: '44px', borderRadius: '12px', background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 } }, '⏭'),
+          h('div', null,
+            h('div', { style: { fontSize: '15px', fontWeight: 800, color: '#1A1A2E' } }, 'Kein Gerät verkauft'),
+            h('div', { style: { fontSize: '12px', color: '#64748b', marginTop: '2px' } }, 'Überspringen und weiter')
+          )
+        )
+      )
+    )
+  );
+};
+
 const ReferralModal = ({
   isOpen,
   onClose,
@@ -19704,6 +20074,10 @@ function App() {
   const [showFinishTypeModal, setShowFinishTypeModal] = useState(false); // NEW MODAL STATE
 
   const [showReferralModal, setShowReferralModal] = useState(false);
+  // Asona myProtect: Verkaufshilfe-Overlay + "Gerät verkauft?"-Erinnerung nach Abschluss
+  const [showAsonaModal, setShowAsonaModal] = useState(false);
+  const [showAsonaReminder, setShowAsonaReminder] = useState(false);
+  const asonaAskedRef = useRef(false);
   // PDF fertig → Teilen-Dialog mit frischer Nutzer-Geste (iOS-Gestenregel)
   const [pdfShareReady, setPdfShareReady] = useState(null);
   const [showFolgeterminModal, setShowFolgeterminModal] = useState(false);
@@ -20043,6 +20417,18 @@ function App() {
   // isReadyToFinish wird weiter unten nach Inhalterkennung berechnet
 
   const [customerSignature, setCustomerSignature] = useState(null);
+  // Asona-Erinnerung genau einmal zeigen, sobald der Fertigstellen-Dialog (ReferralModal)
+  // bei einem UNTERSCHRIEBENEN Abschluss aufgeht. Bei reinem Angebot ohne Unterschrift
+  // (kein Vertrag/kein Gerät) kommt sie nicht. Der Verkäufer entscheidet dann per Ja/Nein.
+  React.useEffect(() => {
+    if (showReferralModal && customerSignature && !asonaAskedRef.current) {
+      asonaAskedRef.current = true;
+      setShowAsonaReminder(true);
+    }
+    if (!showReferralModal) {
+      asonaAskedRef.current = false;
+    }
+  }, [showReferralModal, customerSignature]);
   const SHOP_STAMP_TEXT = CURRENT_SHOP.name;
   const SHOP_STAMP_QR = _qrFor(CURRENT_SHOP.qrUrl);
   const [imageTransform, setImageTransform] = useState({
@@ -28203,7 +28589,17 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       fontSize: '14px',
       cursor: 'pointer'
     }
-  }, "In neuem Tab öffnen"))), /*#__PURE__*/React.createElement(ReferralModal, {
+  }, "In neuem Tab öffnen"))), /*#__PURE__*/React.createElement(AsonaModal, {
+    isOpen: showAsonaModal,
+    onClose: () => setShowAsonaModal(false)
+  }), /*#__PURE__*/React.createElement(AsonaReminder, {
+    isOpen: showAsonaReminder,
+    onJa: () => {
+      setShowAsonaReminder(false);
+      setShowAsonaModal(true);
+    },
+    onNein: () => setShowAsonaReminder(false)
+  }), /*#__PURE__*/React.createElement(ReferralModal, {
     isOpen: showReferralModal,
     onClose: mode => {
       setShowReferralModal(false);
@@ -35529,6 +35925,13 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     title: "Freunde werben (Link)"
   }, /*#__PURE__*/React.createElement(Icon, {
     d: ICONS.Users,
+    size: 18
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAsonaModal(true),
+    className: "p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-pink-50 hover:text-pink-600 transition-colors mr-2 flex items-center justify-center",
+    title: "Asona myProtect (Geräteschutz)"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: ICONS.ShieldCheck,
     size: 18
   })), AKTIONSMAPPE_AKTIV && /*#__PURE__*/React.createElement("button", {
     onClick: openOneDriveLink,
