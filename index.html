@@ -19408,7 +19408,7 @@ function App() {
       });
     });
   })();
-  const PA_UPLOAD_URL = 'PASTE_POWER_AUTOMATE_FLOW_URL_HERE';
+  const PA_UPLOAD_URL = 'https://defaultbffb3b9ff04a4553a4bd451341d982.c3.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/68f976da79094ad5b087fc8072ede002/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=s9FJZh8DErm-GnN-uveNJosKKVKmRCZxoqCyr_X4-38';
   const PA_SHARED_KEY = ''; // optional: z.B. 'hetec-xyz-123'
   // Archiv-Postfach: hierhin schickt der Mitarbeiter das abgeschlossene Angebot (Power Automate sortiert es weiter)
   const ARCHIV_EMAIL = 'telekom-shop-crailsheim@hetec-gmbh.de';
@@ -36654,7 +36654,450 @@ function __startPencilAppWhenReady(attempt = 0) {
     }
   }
 }
-__startPencilAppWhenReady();
+// ═══════════════════════════════════════════════════════════════
+// AUTH-GATE (Login / Selbstregistrierung / Freigabe) — NEU.
+// Ändert nichts an der bestehenden App. Ersetzt nur den direkten
+// Start-Aufruf unten durch diesen Gate-Check; danach läuft alles
+// exakt wie vorher (LINK_EMPLOYEE aus localStorage 'ps_link_agent').
+// Login/Registrierung/Freigabe laufen im EIGENEN Telekom-Projekt
+// "pencil-selling-telekom" — demselben Projekt wie die Statistik
+// oben (STATS_FB_CONFIG). Komplett unabhängig von o2/beta-pencil-
+// selling. Keine Einladungen nötig: Mitarbeiter registrieren sich
+// selbst, Freigabe läuft über das Administrator-Dashboard (Feld
+// 'active' in users/{uid}). Anders als in der o2-Edition gibt es
+// hier nur EINEN Shop (telekom-crailsheim) — deshalb kein Shop-
+// Dropdown bei der Registrierung und keine Shop-Wechsel-Logik beim
+// Start.
+// ═══════════════════════════════════════════════════════════════
+const BETA_FB_CONFIG = STATS_FB_CONFIG;
+const PS_ADMIN_EMAIL = 'd.dasilva@hetec-gmbh.de';
+
+function __psGetBetaApp() {
+  var existing = window.firebase && window.firebase.apps && window.firebase.apps.find(function (a) { return a.name === 'stats'; });
+  return existing ? existing : window.firebase.initializeApp(BETA_FB_CONFIG, 'stats');
+}
+
+function __psGetBetaDb() {
+  if (window.__betaDb) return window.__betaDb;
+  window.__betaDb = window.firebase.firestore(__psGetBetaApp());
+  return window.__betaDb;
+}
+
+function __psGetAuth() {
+  try {
+    if (window.__betaAuth) return window.__betaAuth;
+    window.__betaAuth = window.firebase.auth(__psGetBetaApp());
+    return window.__betaAuth;
+  } catch (e) {
+    console.error('Auth-Init fehlgeschlagen:', e);
+    return null;
+  }
+}
+
+function __psGateRender(html) {
+  var el = document.getElementById('root');
+  if (el) el.innerHTML = html;
+}
+
+function __psShowError(msg) {
+  var box = document.getElementById('ps-gate-msg');
+  if (box) {
+    box.textContent = msg;
+    box.classList.remove('hidden');
+  } else {
+    alert(msg);
+  }
+}
+
+function __psIsAdminEmail(email) {
+  return String(email || '').toLowerCase() === PS_ADMIN_EMAIL;
+}
+
+function __psRenderAuth(mode, prefill) {
+  prefill = prefill || {};
+  var isRegister = mode === 'register';
+  function tabBtn(m, label) {
+    var active = m === mode;
+    return '<button data-mode="' + m + '" class="ps-tab flex-1 py-2 text-sm font-semibold rounded-lg ' +
+      (active ? 'bg-blue-600 text-white' : 'text-slate-500') + '">' + label + '</button>';
+  }
+  var formHtml = isRegister ? (
+    '<select id="ps-gate-anrede" class="w-full mb-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">' +
+      '<option value="">Anrede wählen…</option>' +
+      '<option value="Herr"' + (prefill.anrede === 'Herr' ? ' selected' : '') + '>Herr</option>' +
+      '<option value="Frau"' + (prefill.anrede === 'Frau' ? ' selected' : '') + '>Frau</option>' +
+      '<option value="Divers"' + (prefill.anrede === 'Divers' ? ' selected' : '') + '>Divers</option>' +
+    '</select>' +
+    '<input id="ps-gate-vorname" type="text" placeholder="Vorname (optional)" value="' + (prefill.vorname || '') + '" class="w-full mb-2 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<input id="ps-gate-nachname" type="text" placeholder="Nachname" value="' + (prefill.nachname || '') + '" class="w-full mb-2 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<input id="ps-gate-email" type="email" placeholder="E-Mail (@hetec-gmbh.de)" value="' + (prefill.email || '') + '" class="w-full mb-2 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<input id="ps-gate-pw" type="password" placeholder="Passwort" class="w-full mb-4 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<button id="ps-gate-submit" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg text-sm">Konto erstellen</button>'
+  ) : (
+    '<input id="ps-gate-email" type="email" placeholder="E-Mail" value="' + (prefill.email || '') + '" class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<input id="ps-gate-pw" type="password" placeholder="Passwort" class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+    '<label class="flex items-center gap-2 mb-4 text-sm text-slate-600 cursor-pointer select-none">' +
+      '<input id="ps-gate-remember" type="checkbox" checked class="w-4 h-4" /> Zugangsdaten dauerhaft merken' +
+    '</label>' +
+    '<button id="ps-gate-submit" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg text-sm mb-2">Anmelden</button>' +
+    '<button id="ps-gate-reset-btn" class="w-full text-blue-600 text-xs py-1">Passwort vergessen?</button>'
+  );
+
+  __psGateRender(
+    '<div class="min-h-screen flex items-center justify-center bg-slate-100 p-4">' +
+      '<div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">' +
+        '<h1 class="text-xl font-bold text-slate-800 mb-4">Pencil Selling – Telekom</h1>' +
+        '<div class="flex gap-1 bg-slate-100 rounded-lg p-1 mb-4">' + tabBtn('login', 'Anmelden') + tabBtn('register', 'Registrieren') + '</div>' +
+        '<div id="ps-gate-msg" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-3"></div>' +
+        formHtml +
+      '</div>' +
+    '</div>'
+  );
+
+  Array.prototype.forEach.call(document.querySelectorAll('.ps-tab'), function (btn) {
+    btn.onclick = function () {
+      var vals = {
+        anrede: (document.getElementById('ps-gate-anrede') || {}).value,
+        vorname: (document.getElementById('ps-gate-vorname') || {}).value,
+        nachname: (document.getElementById('ps-gate-nachname') || {}).value,
+        email: (document.getElementById('ps-gate-email') || {}).value
+      };
+      __psRenderAuth(btn.getAttribute('data-mode'), vals);
+    };
+  });
+
+  if (isRegister) {
+    document.getElementById('ps-gate-submit').onclick = function () {
+      var anrede = document.getElementById('ps-gate-anrede').value;
+      var vorname = document.getElementById('ps-gate-vorname').value.trim();
+      var nachname = document.getElementById('ps-gate-nachname').value.trim();
+      var email = document.getElementById('ps-gate-email').value.trim().toLowerCase();
+      var pw = document.getElementById('ps-gate-pw').value;
+      if (!anrede || !nachname || !email || !pw) { __psShowError('Bitte Anrede, Nachname, E-Mail und Passwort ausfüllen.'); return; }
+      if (!/@hetec-gmbh\.de$/.test(email)) { __psShowError('Nur E-Mail-Adressen mit @hetec-gmbh.de erlaubt.'); return; }
+      if (pw.length < 6) { __psShowError('Passwort braucht mind. 6 Zeichen.'); return; }
+      var displayName = vorname ? (vorname + ' ' + nachname).trim() : nachname;
+      var auth = __psGetAuth();
+      auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL).then(function () {
+        return auth.createUserWithEmailAndPassword(email, pw);
+      }).then(function (cred) {
+        return cred.user.sendEmailVerification().then(function () {
+          return __psGetBetaDb().collection('users').doc(cred.user.uid).set({
+            email: email,
+            anrede: anrede,
+            vorname: vorname,
+            nachname: nachname,
+            name: displayName,
+            shopId: CURRENT_SHOP_ID,
+            shop: CURRENT_SHOP.name,
+            brand: 'telekom',
+            role: 'verkaeufer',
+            status: 'pending',
+            active: false,
+            isTestUser: false,
+            createdAt: Date.now()
+          });
+        });
+      }).catch(function (e) {
+        __psShowError('Fehler: ' + (e && e.message || e));
+      });
+    };
+  } else {
+    document.getElementById('ps-gate-submit').onclick = function () {
+      var email = document.getElementById('ps-gate-email').value.trim().toLowerCase();
+      var pw = document.getElementById('ps-gate-pw').value;
+      var remember = document.getElementById('ps-gate-remember').checked;
+      if (!email || !pw) { __psShowError('Bitte E-Mail und Passwort eingeben.'); return; }
+      var auth = __psGetAuth();
+      var persistence = remember ? window.firebase.auth.Auth.Persistence.LOCAL : window.firebase.auth.Auth.Persistence.SESSION;
+      auth.setPersistence(persistence).then(function () {
+        return auth.signInWithEmailAndPassword(email, pw);
+      }).catch(function (e) {
+        __psShowError('Anmeldung fehlgeschlagen: ' + (e && e.message || e));
+      });
+    };
+    document.getElementById('ps-gate-reset-btn').onclick = function () {
+      var email = document.getElementById('ps-gate-email').value.trim();
+      if (!email) { __psShowError('Bitte zuerst E-Mail eingeben.'); return; }
+      __psGetAuth().sendPasswordResetEmail(email).then(function () {
+        __psShowError('E-Mail zum Zurücksetzen wurde verschickt.');
+      }).catch(function (e) {
+        __psShowError('Fehler: ' + (e && e.message || e));
+      });
+    };
+  }
+}
+
+function __psRenderWait(kind) {
+  // SICHERHEITSFIX: 'blocked' entfällt hier - Zugriffsverweigerung (gesperrt/
+  // abgelehnt/deaktiviert/Profil fehlt) meldet jetzt sofort ab und zeigt
+  // Anmelden/Registrieren (siehe __psDenyAccess), statt auf einen eigenen
+  // Wartebildschirm mit manuellem Abmelden-Button zu setzen.
+  var title = kind === 'verify' ? 'E-Mail bestätigen' : 'Warte auf Freigabe';
+  var text = kind === 'verify'
+    ? 'Wir haben dir eine E-Mail geschickt. Bitte bestätige deine Adresse, dann geht es automatisch weiter.'
+    : 'Deine Registrierung war erfolgreich. Dein Zugang muss noch durch einen Administrator freigegeben werden.';
+  __psGateRender(
+    '<div class="min-h-screen flex items-center justify-center bg-slate-100 p-4">' +
+      '<div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6 text-center">' +
+        '<h1 class="text-xl font-bold text-slate-800 mb-2">' + title + '</h1>' +
+        '<p class="text-sm text-slate-500 mb-5">' + text + '</p>' +
+        (kind === 'verify' ? '<button id="ps-gate-resend" class="w-full text-blue-600 text-xs py-2 mb-2">E-Mail erneut senden</button>' : '') +
+        '<button id="ps-gate-logout" class="w-full text-slate-400 text-xs py-1">Abmelden</button>' +
+      '</div>' +
+    '</div>'
+  );
+  if (kind === 'verify') {
+    document.getElementById('ps-gate-resend').onclick = function () {
+      var auth = __psGetAuth();
+      if (auth.currentUser) { auth.currentUser.sendEmailVerification().catch(function () {}); }
+    };
+  }
+  document.getElementById('ps-gate-logout').onclick = function () {
+    __psGetAuth().signOut().then(function () { location.reload(); });
+  };
+}
+
+// SICHERHEITSFIX: zentrale Funktion für JEDEN Fall, in dem der Zugriff
+// verweigert werden muss (Profil fehlt, gesperrt/abgelehnt/deaktiviert,
+// unbekannter Status, Live-Sperrung während der Nutzung). Zeigt SOFORT
+// Anmelden/Registrieren mit einer verständlichen Meldung (nicht erst nach
+// einem Reload) und meldet die Firebase-Sitzung zuverlässig ab.
+// reloadAfter=true nur dann, wenn zuvor schon die komplette Pencil-Selling-
+// Oberfläche lief (appStarted) - dort sorgt ein Reload nach dem Abmelden für
+// einen wirklich sauberen Teardown der laufenden App.
+function __psDenyAccess(message, reloadAfter) {
+  __psRenderAuth('login');
+  try { __psShowError(message); } catch (e) {}
+  try {
+    var p = __psGetAuth().signOut().catch(function () {});
+    if (reloadAfter) { p.then(function () { location.reload(); }); }
+  } catch (e) {}
+}
+
+function __psAddFloatingLogout() {
+  // Fügt ein reines Icon (kein Text, kein Overlay) als echtes Kind-Element
+  // in den bestehenden <header> von Pencil Selling ein – rechtsbündig, wie
+  // die anderen Icons dort. Ein MutationObserver setzt es automatisch neu,
+  // falls React den Header neu rendert und es dabei entfernen würde.
+  function ensureBtn() {
+    var header = document.querySelector('header');
+    if (!header) return;
+    var btn = document.getElementById('ps-logout-icon');
+    if (btn && header.contains(btn)) return;
+    btn = document.createElement('button');
+    btn.id = 'ps-logout-icon';
+    btn.type = 'button';
+    btn.title = 'Abmelden';
+    btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>';
+    btn.style.cssText = 'margin-left:auto;flex-shrink:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#94a3b8;border-radius:8px;cursor:pointer;padding:0;';
+    btn.onmouseenter = function () { btn.style.background = '#fef2f2'; btn.style.color = '#dc2626'; };
+    btn.onmouseleave = function () { btn.style.background = 'transparent'; btn.style.color = '#94a3b8'; };
+    btn.onclick = function () {
+      if (!window.confirm('Wirklich abmelden?')) return;
+      __psGetAuth().signOut().then(function () { location.reload(); });
+    };
+    header.appendChild(btn);
+  }
+
+  var tries = 0;
+  var iv = setInterval(function () {
+    tries++;
+    var header = document.querySelector('header');
+    if (header) {
+      clearInterval(iv);
+      ensureBtn();
+      try {
+        new MutationObserver(function () { ensureBtn(); }).observe(header, { childList: true });
+      } catch (e) {}
+    } else if (tries > 100) {
+      clearInterval(iv);
+    }
+  }, 100);
+}
+
+function __PS_startAuthGate(startAppFn) {
+  var auth = __psGetAuth();
+  if (!auth) { startAppFn(); return; }
+  var appStarted = false;
+
+  function startOnce(profile) {
+    if (appStarted) return;
+    appStarted = true;
+    // Nur EIN Shop in dieser Edition (telekom-crailsheim, fest über
+    // CURRENT_SHOP_ID) — anders als in der o2-Edition gibt es hier keine
+    // Shop-Wechsel-Logik und keinen Reload anhand von profile.shopId.
+    try {
+      localStorage.setItem('ps_link_agent', (profile && profile.name) || '');
+    } catch (e) {}
+    __psAddFloatingLogout();
+    startAppFn();
+  }
+
+  function showFatal(err) {
+    __psGateRender(
+      '<div class="min-h-screen flex items-center justify-center bg-slate-100 p-4 text-center">' +
+        '<div class="max-w-sm">' +
+          '<h1 class="text-lg font-bold text-slate-800 mb-2">Verbindung fehlgeschlagen</h1>' +
+          '<p class="text-sm text-slate-500 mb-4">' + ((err && err.message) ? err.message : 'Unbekannter Fehler. Bitte erneut versuchen.') + '</p>' +
+          '<button id="ps-gate-retry" class="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg mr-2">Erneut versuchen</button>' +
+          '<button id="ps-gate-logout2" class="text-slate-400 text-sm underline">Abmelden</button>' +
+        '</div>' +
+      '</div>'
+    );
+    var r = document.getElementById('ps-gate-retry');
+    if (r) r.onclick = function () { location.reload(); };
+    var l = document.getElementById('ps-gate-logout2');
+    if (l) l.onclick = function () { auth.signOut().then(function () { location.reload(); }); };
+  }
+
+  // SICHERHEITSFIX: ersetzt das bisherige renderCompleteProfile(), das bei
+  // JEDEM fehlenden Profil (auch bei gesperrten/gelöschten Konten) ein neues
+  // "pending"-Profil per set() angelegt und damit die Sperre unterlaufen hat.
+  // Diese Funktion wird NUR noch für ein bereits freigegebenes Profil
+  // (active===true && status==='approved') mit fehlendem Namen aufgerufen
+  // und aktualisiert AUSSCHLIESSLICH vorname/nachname/name per update() -
+  // exakt die Felder, die die Firestore-Regeln für Selbst-Updates erlauben.
+  // Kein shopId, keine Rolle, kein status/active, kein neues Profil.
+  function renderCompleteProfileNameOnly(user) {
+    __psGateRender(
+      '<div class="min-h-screen flex items-center justify-center bg-slate-100 p-4">' +
+        '<div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">' +
+          '<h1 class="text-xl font-bold text-slate-800 mb-1">Profil vervollständigen</h1>' +
+          '<p class="text-sm text-slate-500 mb-4">Einmalig – dein Name fehlt noch in deinem (bereits freigegebenen) Konto.</p>' +
+          '<div id="ps-gate-msg" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-3"></div>' +
+          '<input id="ps-gate-vorname" type="text" placeholder="Vorname (optional)" class="w-full mb-2 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+          '<input id="ps-gate-nachname" type="text" placeholder="Nachname" class="w-full mb-4 px-3 py-2 border border-slate-300 rounded-lg text-sm" />' +
+          '<button id="ps-gate-submit" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg text-sm">Speichern</button>' +
+        '</div>' +
+      '</div>'
+    );
+    document.getElementById('ps-gate-submit').onclick = function () {
+      var vorname = document.getElementById('ps-gate-vorname').value.trim();
+      var nachname = document.getElementById('ps-gate-nachname').value.trim();
+      if (!nachname) { __psShowError('Bitte mindestens den Nachnamen ausfüllen.'); return; }
+      var displayName = vorname ? (vorname + ' ' + nachname).trim() : nachname;
+      __psGetBetaDb().collection('users').doc(user.uid).update({
+        vorname: vorname,
+        nachname: nachname,
+        name: displayName
+      }).catch(function (e) {
+        __psShowError('Fehler: ' + (e && e.message || e));
+      });
+      // Kein weiterer Schritt nötig: der onSnapshot-Listener unten reagiert
+      // automatisch auf das aktualisierte Profil.
+    };
+  }
+
+  auth.onAuthStateChanged(function (user) {
+    if (!user) { __psRenderAuth('login'); return; }
+    // SICHERHEITSFIX: Sicherheitsreihenfolge - Domain zuerst prüfen, vor
+    // jeder weiteren Prüfung/jedem Firestore-Zugriff.
+    if (!/@hetec-gmbh\.de$/i.test(user.email || '')) {
+      __psDenyAccess('Dieses Konto ist für Pencil Selling nicht zugelassen (nur @hetec-gmbh.de).', false);
+      return;
+    }
+    user.reload().then(function () {
+      if (!user.emailVerified) {
+        __psRenderWait('verify');
+        var iv = setInterval(function () {
+          user.reload().then(function () {
+            if (user.emailVerified) { clearInterval(iv); location.reload(); }
+          }).catch(function () {});
+        }, 4000);
+        return;
+      }
+      // Token neu holen: sonst sieht Firestore kurzzeitig noch die alte
+      // email_verified=false-Eigenschaft und blockiert die Nutzer-Abfrage.
+      user.getIdToken(true).then(function () {
+        var isBootstrapAdmin = __psIsAdminEmail(user.email);
+        var autoActivateAttempted = false;
+        var unsubscribeUserDoc = __psGetBetaDb().collection('users').doc(user.uid).onSnapshot(function (snap) {
+          var d = snap.data();
+          if (!d) {
+            // BUGFIX: ein leerer Snapshot direkt aus dem lokalen Cache
+            // (z.B. kurz nach einem Token-Refresh oder Sign-out/Reload)
+            // bedeutet NICHT zuverlässig, dass das Profil wirklich fehlt -
+            // nur, dass gerade nichts Gültiges zwischengespeichert ist.
+            // Erst auf eine vom Server bestätigte Antwort warten.
+            if (snap.metadata && snap.metadata.fromCache) return;
+            if (isBootstrapAdmin) {
+              // Admin-Bootstrapping: falls der Administrator die Haupt-App
+              // vor dem Admin-Dashboard öffnet, existiert sein eigenes
+              // Profil evtl. noch nicht - identisch zu ensureAdminProfile()
+              // im Dashboard automatisch anlegen. Betrifft ausschließlich
+              // d.dasilva@hetec-gmbh.de; für alle anderen gilt unten die
+              // Zugriffsverweigerung.
+              __psGetBetaDb().collection('users').doc(user.uid).set({
+                email: user.email,
+                name: 'Diego da Silva',
+                vorname: 'Diego',
+                nachname: 'da Silva',
+                role: 'admin',
+                active: true,
+                status: 'approved',
+                isTestUser: false,
+                shopId: '',
+                shop: 'Verwaltung / Alle Shops',
+                createdAt: Date.now()
+              }).catch(function (e) { console.error('Admin-Profil konnte nicht angelegt werden:', e); });
+              return; // onSnapshot feuert gleich erneut mit dem frisch angelegten Profil
+            }
+            // SICHERHEITSFIX: Fehlendes Profil darf niemals neu angelegt
+            // werden - weder durch "Profil vervollständigen" noch sonst
+            // irgendeine automatische Profilerstellung. Immer: Zugang
+            // verweigern und abmelden, niemals ein neues Profil erzeugen.
+            if (unsubscribeUserDoc) { try { unsubscribeUserDoc(); } catch (e) {} }
+            __psDenyAccess('Dein Zugang ist nicht mehr vorhanden oder wurde gesperrt. Bitte wende dich an einen Administrator.', appStarted);
+            return;
+          }
+          // SICHERHEITSFIX: strenge Positivprüfung statt einer laxen
+          // "!== false"-Prüfung. Nur bei GENAU diesen beiden Werten wird
+          // Zugriff gewährt; jeder andere/unbekannte/fehlende Status wird
+          // als "kein Zugriff" behandelt.
+          var darfZugreifen = d.active === true && d.status === 'approved';
+          if (darfZugreifen || isBootstrapAdmin) {
+            var fehltName = !((d.nachname && String(d.nachname).trim()) || (d.name && String(d.name).trim()));
+            if (fehltName && !isBootstrapAdmin) {
+              renderCompleteProfileNameOnly(user);
+            } else {
+              startOnce(d);
+            }
+          } else if (appStarted) {
+            // Admin hat das Konto WÄHREND der Nutzung gesperrt/deaktiviert
+            // (oder das Profil gelöscht). Sofort abmelden und zur
+            // Anmelden/Registrieren-Seite - nicht erst nach einem
+            // Reload-Umweg (siehe Cache-Hinweis oben).
+            if (unsubscribeUserDoc) { try { unsubscribeUserDoc(); } catch (e) {} }
+            __psDenyAccess('Dein Zugang wurde soeben gesperrt. Bitte wende dich an einen Administrator.', true);
+          } else if (d.status === 'pending' && !autoActivateAttempted) {
+            // Auf Wunsch (nach Rücksprache) wieder aktiviert: automatische
+            // Freischaltung nach E-Mail-Bestätigung, damit kein Admin-Klick
+            // nötig ist. Sicher, weil NUR für status:'pending' - ein einmal
+            // abgelehntes/gesperrtes/gelöschtes Konto hat einen ANDEREN
+            // Status und landet weiterhin im else-Zweig (sofort abmelden).
+            autoActivateAttempted = true;
+            __psGetBetaDb().collection('users').doc(user.uid)
+              .update({ active: true, status: 'approved' })
+              .catch(function (e) {
+                autoActivateAttempted = false;
+                console.error('Automatische Freischaltung fehlgeschlagen (evtl. fehlt die Firestore-Regel dafür):', e);
+                __psRenderWait('approval');
+              });
+          } else {
+            // rejected / gesperrt / blocked / deleted / unbekannter Status /
+            // active:false mit status:'approved' (z.B. Deaktivierung) -
+            // niemals Zugriff erlauben, sofort abmelden.
+            if (unsubscribeUserDoc) { try { unsubscribeUserDoc(); } catch (e) {} }
+            __psDenyAccess('Dein Zugang ist nicht mehr vorhanden oder wurde gesperrt. Bitte wende dich an einen Administrator.', false);
+          }
+        }, function (err) { showFatal(err); });
+      }).catch(showFatal);
+    }).catch(showFatal);
+  });
+}
+
+__PS_startAuthGate(__startPencilAppWhenReady);
 
 // === v24: Bundle-Laufzeit Dropdown/Badge sichtbar machen (Tailwind-Klassen fehlen im Pencil-Selling) ===
 (function () {
