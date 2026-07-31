@@ -3723,7 +3723,7 @@ html.device-android-tablet .sit-aside-panel {
 
         window.psSendToSharePoint = function(payload) {
             try {
-                var url = localStorage.getItem('ps_pa_webhook') || '';
+                var url = localStorage.getItem('tps_pa_webhook') || '';
                 if (!url || !url.startsWith('https://')) return;
                 fetch(url, {
                     method: 'POST',
@@ -4300,13 +4300,13 @@ const LINK_EMPLOYEE = (() => {
     // nächsten Mal ohne Parameter von dort wiederherstellen.
     if (cleaned) {
       try {
-        localStorage.setItem('ps_link_agent', cleaned);
+        localStorage.setItem('tps_link_agent', cleaned);
       } catch (_) {}
       return cleaned;
     }
     // Kein Link-Parameter → zuletzt gemerkten Agent nehmen (falls vorhanden)
     try {
-      const saved = (localStorage.getItem('ps_link_agent') || '').trim();
+      const saved = (localStorage.getItem('tps_link_agent') || '').trim();
       if (saved) return saved;
     } catch (_) {}
     return '';
@@ -4335,12 +4335,12 @@ const LINK_SHOPWECHSEL = (() => {
     if (roh !== '') {
       const an = roh === '1' || roh.toLowerCase() === 'true' || roh.toLowerCase() === 'ja';
       try {
-        localStorage.setItem('ps_shopwechsel', an ? '1' : '0');
+        localStorage.setItem('tps_shopwechsel', an ? '1' : '0');
       } catch (_) {}
       return an;
     }
     try {
-      if (localStorage.getItem('ps_shopwechsel') === '1') return true;
+      if (localStorage.getItem('tps_shopwechsel') === '1') return true;
     } catch (_) {}
   } catch (e) {}
   return false;
@@ -4440,7 +4440,7 @@ const ICONS = {
 const ANALYTICS_STORAGE_KEY = 'pencil_analytics_v1';
 const STATS_PASSWORD = (() => {
   try {
-    return localStorage.getItem('ps_stats_pw') || 'telekom2026';
+    return localStorage.getItem('tps_stats_pw') || 'telekom2026';
   } catch (e) {
     return 'telekom2026';
   }
@@ -11945,14 +11945,14 @@ const AdminModal = ({
     type: "url",
     defaultValue: (() => {
       try {
-        return localStorage.getItem('ps_pa_webhook') || '';
+        return localStorage.getItem('tps_pa_webhook') || '';
       } catch (e) {
         return '';
       }
     })(),
     onChange: e => {
       try {
-        if (e.target.value.trim()) localStorage.setItem('ps_pa_webhook', e.target.value.trim());else localStorage.removeItem('ps_pa_webhook');
+        if (e.target.value.trim()) localStorage.setItem('tps_pa_webhook', e.target.value.trim());else localStorage.removeItem('tps_pa_webhook');
       } catch (err) {}
     },
     placeholder: "https://prod-xx.westeurope.logic.azure.com/workflows/...",
@@ -11982,7 +11982,7 @@ const AdminModal = ({
         return;
       }
       try {
-        localStorage.setItem("ps_stats_pw", v);
+        localStorage.setItem("tps_stats_pw", v);
       } catch (e) {}
       document.getElementById("admin-new-pw-field").value = "";
       alert("Passwort gespeichert!");
@@ -14118,7 +14118,7 @@ const PinLockModal = ({
   if (!isOpen) return null;
   const getStoredPw = () => {
     try {
-      return localStorage.getItem('ps_stats_pw') || 'telekom2026';
+      return localStorage.getItem('tps_stats_pw') || 'telekom2026';
     } catch (e) {
       return 'telekom2026';
     }
@@ -17769,7 +17769,7 @@ const OfferValidityModal = ({
 // Kein manuelles PDF-in-Ordner-schieben mehr. Ein Tipp = gespeichert.
 // IndexedDB: persistent, groß genug für Handschrift-Daten, offline-fähig.
 // ═══════════════════════════════════════════════════════════════
-const OFFER_DB_NAME = 'PencilSellingOffers';
+const OFFER_DB_NAME = 'PencilSellingOffersTelekom';
 const OFFER_STORE = 'offers';
 const OFFER_DB_VERSION = 1;
 function openOfferDB() {
@@ -17855,7 +17855,7 @@ async function deleteOffer(id) {
 // da ist, ruft man es ab und verschickt es dann korrekt archiviert.
 // Eigener IndexedDB-Store, gleiche Technik wie die Angebots-Speicherung.
 // ═══════════════════════════════════════════════════════════════
-const PARK_DB_NAME = 'PencilSellingParked';
+const PARK_DB_NAME = 'PencilSellingParkedTelekom';
 const PARK_STORE = 'parked';
 const PARK_DB_VERSION = 1;
 const PARK_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 Stunden
@@ -17945,19 +17945,19 @@ function trackOutputAction(kind) {
   // kind: 'print' | 'digital'
   try {
     const monthKey = new Date().toISOString().slice(0, 7); // "2026-06"
-    const raw = localStorage.getItem('ps_output_counters');
+    const raw = localStorage.getItem('tps_output_counters');
     const data = raw ? JSON.parse(raw) : {};
     if (!data[monthKey]) data[monthKey] = {
       print: 0,
       digital: 0
     };
     if (kind === 'print') data[monthKey].print += 1;else if (kind === 'digital') data[monthKey].digital += 1;
-    localStorage.setItem('ps_output_counters', JSON.stringify(data));
+    localStorage.setItem('tps_output_counters', JSON.stringify(data));
   } catch (_) {}
 }
 function getOutputCounters() {
   try {
-    const raw = localStorage.getItem('ps_output_counters');
+    const raw = localStorage.getItem('tps_output_counters');
     return raw ? JSON.parse(raw) : {};
   } catch (_) {
     return {};
@@ -19410,7 +19410,7 @@ function App() {
     });
   })();
   const PA_UPLOAD_URL = 'https://defaultbffb3b9ff04a4553a4bd451341d982.c3.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/68f976da79094ad5b087fc8072ede002/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=s9FJZh8DErm-GnN-uveNJosKKVKmRCZxoqCyr_X4-38';
-  const PA_SHARED_KEY = ''; // optional: z.B. 'hetec-xyz-123'
+  const PA_SHARED_KEY = 'hetec-ps-9f3k'; // muss zum "key"-Check im Power-Automate-Flow passen
   // Archiv-Postfach: hierhin schickt der Mitarbeiter das abgeschlossene Angebot (Power Automate sortiert es weiter)
   const ARCHIV_EMAIL = 'telekom-shop-crailsheim@hetec-gmbh.de';
   // SharePoint-Ordner zum direkten Abrufen der archivierten PDFs
@@ -22332,13 +22332,10 @@ function App() {
               setTimeout(() => setShowReferralModal(true), 400);
             }).catch(e => triggerToast('PDF-Fehler: ' + (e && e.message ? e.message : 'Unbekannt')));
           })) return;
-          backgroundAutoUpload({
-            type: 'abschluss',
-            triggerToast,
-            ensurePrintHeaders,
-            getAgent: getAgentDisplayNameForUpload,
-            getDsl: getDslFlagForUpload
-          });
+          // v74: entfernt – der Hintergrund-Upload läuft jetzt zentral über
+          // dispatchArchiveMail() (silentBackgroundArchiveUpload) für JEDEN
+          // Archiv-Weg, nicht nur für diesen einen Abschluss-Druck-Pfad.
+          // Vermeidet außerdem einen doppelten/unvollständigen Upload hier.
           // Exakt dieselbe Logik wie der "PDF drucken / Empfohlen"-Button im FinishTypeModal
           (async () => {
             triggerToast('PDF wird erstellt… einen Moment.');
@@ -22445,7 +22442,7 @@ function App() {
       const _nr = 'PS-' + new Date().toISOString().slice(2, 10).replace(/-/g, '') + '-' + Math.random().toString(36).slice(2, 5).toUpperCase();
       const _arc = (() => {
         try {
-          return JSON.parse(localStorage.getItem('ps_admin_archive') || '[]');
+          return JSON.parse(localStorage.getItem('tps_admin_archive') || '[]');
         } catch (e) {
           return [];
         }
@@ -22464,7 +22461,7 @@ function App() {
           Kundenname: textData && textData.Kundenname || ''
         }
       });
-      localStorage.setItem('ps_admin_archive', JSON.stringify(_arc));
+      localStorage.setItem('tps_admin_archive', JSON.stringify(_arc));
       triggerToast('✅ Vorgang ' + _nr + ' gespeichert');
     } catch (e) {}
     if (type === 'quote') {
@@ -22626,7 +22623,7 @@ function App() {
       const _nr = 'PS-' + new Date().toISOString().slice(2, 10).replace(/-/g, '') + '-' + Math.random().toString(36).slice(2, 5).toUpperCase();
       const _arc = (() => {
         try {
-          return JSON.parse(localStorage.getItem('ps_admin_archive') || '[]');
+          return JSON.parse(localStorage.getItem('tps_admin_archive') || '[]');
         } catch (e) {
           return [];
         }
@@ -22645,7 +22642,7 @@ function App() {
           Kundenname: textData && textData.Kundenname || ''
         }
       });
-      localStorage.setItem('ps_admin_archive', JSON.stringify(_arc));
+      localStorage.setItem('tps_admin_archive', JSON.stringify(_arc));
     } catch (e) {}
 
     // Papier-Unterschrift: Angebotsgültigkeit VOR dem Freunde-werben-Popup abfragen,
@@ -27096,7 +27093,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       // rendern. Spart auf jedem Tablet unnötige Rechenlast bei jedem Abschluss.
       const _webhook = (() => {
         try {
-          return localStorage.getItem('ps_pa_webhook') || '';
+          return localStorage.getItem('tps_pa_webhook') || '';
         } catch (e) {
           return '';
         }
@@ -27497,6 +27494,48 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     }
     return betreff;
   };
+  // ══════════════════════════════════════════════════════════════════════
+  // AUTOMATISCHER HINTERGRUND-UPLOAD an Power Automate (v74).
+  // Läuft bei JEDER Archivierung zusätzlich zum manuellen Teilen/Mailen -
+  // "fire and forget": wird nie awaited, blockiert die UI nie, Fehler
+  // werden nur leise geloggt (Verkauf/Teilen darf dadurch nie stocken).
+  // Der Flow selbst verschickt die Mail an pencil-selling@hetec-gmbh.de;
+  // eine zweite (separate) Mailbox-Flow sortiert von dort nach SharePoint -
+  // dafür MUSS archiveFileName exakt dem PENCIL_[Shop]_[Typ]_...-Schema
+  // folgen (siehe buildArchivDateiname).
+  // ══════════════════════════════════════════════════════════════════════
+  const silentBackgroundArchiveUpload = (blob, dateiname, betreff) => {
+    (async () => {
+      try {
+        if (!PA_UPLOAD_URL || PA_UPLOAD_URL.includes('PASTE_POWER_AUTOMATE_FLOW_URL_HERE')) return;
+        const teile = String(betreff || '').split('|'); // PENCIL|typ|datum|agent
+        const typ = teile[1] === 'abschluss' ? 'abschluss' : 'angebot';
+        const datum = teile[2] || new Date().toISOString().slice(0, 10);
+        const agent = teile[3] || '';
+        const pdfBase64 = await blobToBase64(blob);
+        const res = await fetch(PA_UPLOAD_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: typ,
+            dsl: '',
+            agent,
+            shop: window.__PS_SHOP_ORT || '',
+            date: datum,
+            ts: new Date().toISOString(),
+            key: PA_SHARED_KEY,
+            pdfBase64,
+            archiveSubject: betreff,
+            archiveFileName: dateiname
+          })
+        });
+        if (!res.ok) console.warn('[ARCHIV] Hintergrund-Upload fehlgeschlagen:', res.status);
+      } catch (e) {
+        console.warn('[ARCHIV] Hintergrund-Upload übersprungen:', e && e.message || e);
+      }
+    })();
+  };
+
   const dispatchArchiveMail = async (blob, dateiname, betreff, preOpenedTab) => {
     // GESPERRT: Betreff wird hier nochmals validiert – überzählige Felder werden entfernt.
     // Fehlt der Betreff wider Erwarten, wird immer ein gültiger Ersatz erzeugt.
@@ -27515,6 +27554,11 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         betreff = buildArchivBetreff(fallbackType, new Date().toISOString().slice(0, 10), '', '');
       }
     } catch (e) {}
+
+    // Automatischer Kopie-Upload läuft IMMER mit (mit dem oben validierten
+    // Betreff), unabhängig davon, ob der Mitarbeiter das manuelle
+    // Teilen/Senden unten abbricht oder nicht.
+    silentBackgroundArchiveUpload(blob, dateiname, betreff);
     const saveBlob = b => {
       const url = URL.createObjectURL(b);
       const a = document.createElement('a');
@@ -29670,7 +29714,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       })();
       if (hatInhalt && !window.confirm('Shop wechseln?\n\nDie Seite wird neu geladen, damit Deckblatt, Adresse und Gutschein-Code zum neuen Shop passen.\nNicht gespeicherte Eingaben gehen verloren.')) return;
       try {
-        localStorage.setItem('ps_shop', neu);
+        localStorage.setItem('tps_shop', neu);
       } catch (_) {}
       try {
         const u = new URL(window.location.href);
@@ -36659,7 +36703,7 @@ function __startPencilAppWhenReady(attempt = 0) {
 // AUTH-GATE (Login / Selbstregistrierung / Freigabe) — NEU.
 // Ändert nichts an der bestehenden App. Ersetzt nur den direkten
 // Start-Aufruf unten durch diesen Gate-Check; danach läuft alles
-// exakt wie vorher (LINK_EMPLOYEE aus localStorage 'ps_link_agent').
+// exakt wie vorher (LINK_EMPLOYEE aus localStorage 'tps_link_agent').
 // Login/Registrierung/Freigabe laufen im EIGENEN Telekom-Projekt
 // "pencil-selling-telekom" — demselben Projekt wie die Statistik
 // oben (STATS_FB_CONFIG). Komplett unabhängig von o2/beta-pencil-
@@ -36932,7 +36976,7 @@ function __PS_startAuthGate(startAppFn) {
     // CURRENT_SHOP_ID) — anders als in der o2-Edition gibt es hier keine
     // Shop-Wechsel-Logik und keinen Reload anhand von profile.shopId.
     try {
-      localStorage.setItem('ps_link_agent', (profile && profile.name) || '');
+      localStorage.setItem('tps_link_agent', (profile && profile.name) || '');
     } catch (e) {}
     __psAddFloatingLogout();
     startAppFn();
