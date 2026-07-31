@@ -37129,18 +37129,11 @@ function __PS_startAuthGate(startAppFn) {
       __psDenyAccess('Dieses Konto ist für Pencil Selling nicht zugelassen (nur @hetec-gmbh.de).', false);
       return;
     }
-    user.reload().then(function () {
-      if (!user.emailVerified) {
-        __psRenderWait('verify');
-        var iv = setInterval(function () {
-          user.reload().then(function () {
-            if (user.emailVerified) { clearInterval(iv); location.reload(); }
-          }).catch(function () {});
-        }, 4000);
-        return;
-      }
-      // Token neu holen: sonst sieht Firestore kurzzeitig noch die alte
-      // email_verified=false-Eigenschaft und blockiert die Nutzer-Abfrage.
+
+    // Token neu holen + Profil-Listener starten. Ausgelagert, damit sowohl
+    // der normale Weg (erst E-Mail bestätigen) als auch der Admin-Vorrang-
+    // Weg unten (Profil ist schon freigegeben) hierher führen können.
+    function proceedToProfileGate() {
       user.getIdToken(true).then(function () {
         var isBootstrapAdmin = __psIsAdminEmail(user.email);
         var autoActivateAttempted = false;
@@ -37225,7 +37218,38 @@ function __PS_startAuthGate(startAppFn) {
           }
         }, function (err) { showFatal(err); });
       }).catch(showFatal);
-    }).catch(showFatal);
+    }
+
+    // NEU: Admin-Freigabe geht vor E-Mail-Bestätigung. Wurde der Mitarbeiter
+    // bereits über die Mitarbeiterverwaltung freigegeben (active+approved),
+    // kommt er sofort rein - unabhängig davon, ob/wann die Bestätigungsmail
+    // ankommt. Das eigene Profil lesen ist auch OHNE bestätigte E-Mail
+    // erlaubt (Firestore-Regel: dafür reicht istFirmenKonto()). Ist noch
+    // NICHT freigegeben, läuft es wie bisher: erst E-Mail bestätigen.
+    __psGetBetaDb().collection('users').doc(user.uid).get().then(function (snap) {
+      var d = snap.exists ? snap.data() : null;
+      var bereitsFreigegeben = !!d && d.active === true && d.status === 'approved';
+      if (bereitsFreigegeben || __psIsAdminEmail(user.email)) {
+        proceedToProfileGate();
+        return;
+      }
+      waitForEmailThenProceed();
+    }).catch(function () { waitForEmailThenProceed(); });
+
+    function waitForEmailThenProceed() {
+      user.reload().then(function () {
+        if (!user.emailVerified) {
+          __psRenderWait('verify');
+          var iv = setInterval(function () {
+            user.reload().then(function () {
+              if (user.emailVerified) { clearInterval(iv); location.reload(); }
+            }).catch(function () {});
+          }, 4000);
+          return;
+        }
+        proceedToProfileGate();
+      }).catch(showFatal);
+    }
   });
 }
 
