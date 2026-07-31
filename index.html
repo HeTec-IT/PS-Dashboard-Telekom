@@ -27495,43 +27495,102 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     return betreff;
   };
   // ══════════════════════════════════════════════════════════════════════
-  // AUTOMATISCHER HINTERGRUND-UPLOAD an Power Automate (v74).
-  // Läuft bei JEDER Archivierung zusätzlich zum manuellen Teilen/Mailen -
-  // "fire and forget": wird nie awaited, blockiert die UI nie, Fehler
-  // werden nur leise geloggt (Verkauf/Teilen darf dadurch nie stocken).
-  // Der Flow selbst verschickt die Mail an pencil-selling@hetec-gmbh.de;
-  // eine zweite (separate) Mailbox-Flow sortiert von dort nach SharePoint -
-  // dafür MUSS archiveFileName exakt dem PENCIL_[Shop]_[Typ]_...-Schema
-  // folgen (siehe buildArchivDateiname).
   // ══════════════════════════════════════════════════════════════════════
-  const silentBackgroundArchiveUpload = (blob, dateiname, betreff) => {
-    (async () => {
+  // ZENTRALE FUNKTION für ALLE internen Archiv-Uploads (1:1 wie o2, v53.7-
+  // Portierung): automatisch bei jeder Archivierung. Blockiert den Verkauf
+  // NIE (Fehler werden hier abgefangen). Solange ARCHIVE_FLOW_URL der
+  // Platzhalter ist: leise überspringen.
+  // ══════════════════════════════════════════════════════════════════════
+  const ARCHIVE_FLOW_URL = PA_UPLOAD_URL;
+  const ARCHIVE_FLOW_KEY = PA_SHARED_KEY;
+  const sendArchivCopyToNewFlow = (blob, opts) => {
+    opts = opts || {};
+    return (async () => {
       try {
-        if (!PA_UPLOAD_URL || PA_UPLOAD_URL.includes('PASTE_POWER_AUTOMATE_FLOW_URL_HERE')) return;
-        const teile = String(betreff || '').split('|'); // PENCIL|typ|datum|agent
-        const typ = teile[1] === 'abschluss' ? 'abschluss' : 'angebot';
-        const datum = teile[2] || new Date().toISOString().slice(0, 10);
-        const agent = teile[3] || '';
+        if (!blob || !ARCHIVE_FLOW_URL || ARCHIVE_FLOW_URL.includes('PASTE_POWER_AUTOMATE_FLOW_URL_HERE')) return;
+        const _typ = opts.type === 'abschluss' || opts.type === 'angebot' ? opts.type : customerSignature ? 'abschluss' : 'angebot';
+        let _ruf = '';
+        try {
+          _ruf = sharedMsisdnRef.current || (textData?.Rufnummer || '').replace(/[^0-9+]/g, '').trim();
+        } catch (e) {}
+        let _kunde = '';
+        try {
+          _kunde = cleanKundeName(sharedKundeRef.current || textData?.Kundenname || '');
+        } catch (e) {}
+        let _agent = opts.agent || '';
+        if (!_agent) {
+          try {
+            _agent = getAgentDisplayNameForUpload();
+            if (_agent === '–') _agent = '';
+          } catch (e) {}
+        }
+        let _dsl = opts.dsl || '';
+        if (_dsl !== 'ja' && _dsl !== 'nein') {
+          try {
+            _dsl = getDslFlagForUpload();
+          } catch (e) {
+            _dsl = 'nein';
+          }
+        }
+        if (_dsl !== 'ja' && _dsl !== 'nein') _dsl = 'nein';
+        let _shop = '';
+        try {
+          _shop = String(window.__PS_SHOP_ORT || '').trim();
+        } catch (e) {}
+        const _datum = new Date().toISOString().slice(0, 10);
+
+        let archiveSubject = opts.archiveSubject ? String(opts.archiveSubject) : '';
+        if (!archiveSubject) {
+          try {
+            archiveSubject = String(buildArchivBetreff(_typ, _datum, _ruf, _agent) || '');
+          } catch (e) {}
+        }
+        if (!archiveSubject || !/^PENCIL\|/.test(archiveSubject)) {
+          archiveSubject = `PENCIL|${_typ}|${_datum}|${_agent || 'unbekannt'}`;
+        }
+        let archiveFileName = opts.archiveFileName ? String(opts.archiveFileName) : '';
+        if (!archiveFileName) {
+          try {
+            archiveFileName = String(buildArchivDateiname(_typ, _datum, _typ === 'abschluss' ? _ruf : _kunde) || '');
+          } catch (e) {}
+        }
+        if (!archiveFileName) archiveFileName = `PENCIL_${_typ === 'abschluss' ? 'Abschluss' : 'Angebot'}_${_datum}.pdf`;
+        if (!/\.pdf$/i.test(archiveFileName)) archiveFileName += '.pdf';
+
         const pdfBase64 = await blobToBase64(blob);
-        const res = await fetch(PA_UPLOAD_URL, {
+
+        try {
+          console.log({
+            archiveFileName,
+            archiveSubject,
+            pdfBase64Vorhanden: !!pdfBase64,
+            pdfBase64Laenge: pdfBase64?.length
+          });
+        } catch (e) {}
+
+        const _nowISO = new Date().toISOString();
+        const payload = {
+          key: ARCHIVE_FLOW_KEY,
+          type: _typ,
+          dsl: _dsl,
+          agent: _agent,
+          shop: _shop,
+          date: _nowISO.slice(0, 10),
+          ts: _nowISO,
+          archiveFileName: archiveFileName,
+          archiveSubject: archiveSubject,
+          pdfBase64: pdfBase64
+        };
+        await fetch(ARCHIVE_FLOW_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: typ,
-            dsl: '',
-            agent,
-            shop: window.__PS_SHOP_ORT || '',
-            date: datum,
-            ts: new Date().toISOString(),
-            key: PA_SHARED_KEY,
-            pdfBase64,
-            archiveSubject: betreff,
-            archiveFileName: dateiname
-          })
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) console.warn('[ARCHIV] Hintergrund-Upload fehlgeschlagen:', res.status);
       } catch (e) {
-        console.warn('[ARCHIV] Hintergrund-Upload übersprungen:', e && e.message || e);
+        console.warn('[ARCHIV-FLOW] Upload fehlgeschlagen:', e);
       }
     })();
   };
@@ -27555,10 +27614,35 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       }
     } catch (e) {}
 
-    // Automatischer Kopie-Upload läuft IMMER mit (mit dem oben validierten
-    // Betreff), unabhängig davon, ob der Mitarbeiter das manuelle
-    // Teilen/Senden unten abbricht oder nicht.
-    silentBackgroundArchiveUpload(blob, dateiname, betreff);
+    // EIN Ziel für ALLE Archiv-Wege: sendArchivCopyToNewFlow() lädt selbst
+    // hoch, der manuelle Teilen-Dialog wird dabei komplett übersprungen -
+    // genau wie bei o2. Bleibt ARCHIVE_FLOW_URL der Platzhalter, läuft der
+    // bisherige Teilen-Weg unten unverändert weiter.
+    if (ARCHIVE_FLOW_URL && !ARCHIVE_FLOW_URL.includes('PASTE_POWER_AUTOMATE_FLOW_URL_HERE')) {
+      const _felder = String(betreff || '').split('|');
+      const _typUpload = _felder[1] === 'abschluss' ? 'abschluss' : 'angebot';
+      const _agentUpload = _felder[3] || '';
+      let _dslUpload = 'nein';
+      try {
+        _dslUpload = getDslFlagForUpload();
+      } catch (e) {}
+      try {
+        await sendArchivCopyToNewFlow(blob, {
+          type: _typUpload,
+          agent: _agentUpload,
+          dsl: _dslUpload,
+          archiveFileName: dateiname,
+          archiveSubject: betreff
+        });
+        try {
+          triggerToast('✅ Archiviert.');
+        } catch (e) {}
+      } catch (e) {
+        console.warn('[ARCHIV-FLOW] Upload fehlgeschlagen:', e);
+      }
+      return; // fertig - kein Teilen-Fenster nötig
+    }
+
     const saveBlob = b => {
       const url = URL.createObjectURL(b);
       const a = document.createElement('a');
