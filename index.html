@@ -36878,8 +36878,12 @@ function __psDenyAccess(message, reloadAfter) {
 function __psAddFloatingLogout() {
   // Fügt ein reines Icon (kein Text, kein Overlay) als echtes Kind-Element
   // in den bestehenden <header> von Pencil Selling ein – rechtsbündig, wie
-  // die anderen Icons dort. Ein MutationObserver setzt es automatisch neu,
-  // falls React den Header neu rendert und es dabei entfernen würde.
+  // die anderen Icons dort. Ein MutationObserver auf document.body (statt
+  // nur auf den einmal gefundenen Header) setzt es automatisch neu, egal
+  // ob der Header erst später erscheint (z.B. bei langsamer Babel-
+  // Transpilierung der großen Datei) oder React ihn komplett neu erstellt
+  // statt nur zu aktualisieren – vorher gab die Suche nach 10s endgültig
+  // auf und der Button fehlte dann dauerhaft.
   function ensureBtn() {
     var header = document.querySelector('header');
     if (!header) return;
@@ -36890,7 +36894,7 @@ function __psAddFloatingLogout() {
     btn.type = 'button';
     btn.title = 'Abmelden';
     btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>';
-    btn.style.cssText = 'margin-left:auto;flex-shrink:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#94a3b8;border-radius:8px;cursor:pointer;padding:0;';
+    btn.style.cssText = 'margin-left:auto;flex-shrink:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#94a3b8;border-radius:8px;cursor:pointer;padding:0;position:relative;z-index:50;';
     btn.onmouseenter = function () { btn.style.background = '#fef2f2'; btn.style.color = '#dc2626'; };
     btn.onmouseleave = function () { btn.style.background = 'transparent'; btn.style.color = '#94a3b8'; };
     btn.onclick = function () {
@@ -36900,20 +36904,19 @@ function __psAddFloatingLogout() {
     header.appendChild(btn);
   }
 
+  ensureBtn();
+  try {
+    new MutationObserver(function () { ensureBtn(); }).observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  // Zusätzliches Sicherheitsnetz: falls der Observer aus irgendeinem Grund
+  // nichts meldet (z.B. sehr erste Sekunden vor dem ersten React-Mount),
+  // zusätzlich ein paar Sekunden lang aktiv nachschauen.
   var tries = 0;
   var iv = setInterval(function () {
     tries++;
-    var header = document.querySelector('header');
-    if (header) {
-      clearInterval(iv);
-      ensureBtn();
-      try {
-        new MutationObserver(function () { ensureBtn(); }).observe(header, { childList: true });
-      } catch (e) {}
-    } else if (tries > 100) {
-      clearInterval(iv);
-    }
-  }, 100);
+    ensureBtn();
+    if (tries > 150) clearInterval(iv);
+  }, 200);
 }
 
 function __PS_startAuthGate(startAppFn) {
