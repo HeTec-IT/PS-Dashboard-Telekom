@@ -5261,6 +5261,11 @@ const ALL_LANGUAGES = [{
   name: 'Türkisch',
   flag: '🇹🇷',
   languageCode: 'tr'
+}, {
+  code: 'uk',
+  name: 'Ukrainisch',
+  flag: '🇺🇦',
+  languageCode: 'uk'
 }];
 const SORTED_LANGUAGES = [ALL_LANGUAGES.find(l => l.code === 'de'), ...ALL_LANGUAGES.filter(l => l.code !== 'de').sort((a, b) => a.name.localeCompare(b.name))];
 const SITUATION_ITEMS = [{
@@ -5664,6 +5669,33 @@ const MOCK_TRANSLATIONS = {
     StatusOpen: 'Açık',
     StatusClosed: 'Kapalı',
     StatusNeutral: 'Tarafsız'
+  },
+  uk: {
+    Offer1Title: '1. Пристрої, провайдер і використання',
+    Offer2Title: '2. Домогосподарство та інші продукти',
+    Offer3Title: '3. Телебачення і Wi-Fi',
+    CostHeader: 'Огляд витрат і висновок',
+    CostEinmalig: 'ОДНОРАЗОВО (€)',
+    CostMonatlich1: 'ЩОМІСЯЦЯ, 1-Й РІК (€)',
+    CostMonatlich: 'ЩОМІСЯЦЯ (€)',
+    CostMonatlich2: 'ЩОМІСЯЦЯ, 2-Й РІК (€)',
+    CostSmartphone: 'РОЗСТРОЧКА НА СМАРТФОН (€/МІС)',
+    AgentLabel: 'ОСОБИСТИЙ АГЕНТ',
+    DateLabel: 'ДАТА',
+    ValidUntilLabel: 'ПРОПОЗИЦІЯ ДІЙСНА ДО',
+    Kundenname_Label: 'Ім’я клієнта',
+    Rufnummer_Label: 'Номер телефону',
+    Anbieter_Label: 'Провайдер',
+    Hardware_Label: 'Пристрої',
+    Nutzung_Label: 'Використання',
+    Haushalt_Label: 'Домогосподарство',
+    'Weitere Produkte_Label': 'Інші продукти',
+    Fernsehen_Label: 'Телебачення',
+    WiFi_Label: 'WiFi',
+    Gesamtkosten_Label: 'Загальні витрати',
+    StatusOpen: 'Відкрито',
+    StatusClosed: 'Завершено',
+    StatusNeutral: 'Нейтрально'
   }
 };
 const SectionCard = ({
@@ -8029,6 +8061,13 @@ const SpeedModal = ({
     emoji: '🎬',
     label: '4K-Streaming',
     dl: 25,
+    ul: 2,
+    n: 0
+  }, {
+    k: 'iptv',
+    emoji: '📡',
+    label: 'IPTV (Ausland-TV)',
+    dl: 40,
     ul: 2,
     n: 0
   }, {
@@ -23013,7 +23052,10 @@ function App() {
         if (!val || val.trim().length < 2 || !/[A-Za-zÄÖÜäöüß]/.test(val) || /^[\d.,:\s€%+-]+$/.test(val.trim())) return;
         try {
           const res = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(val.slice(0, 480)) + '&langpair=de|' + displayLanguage);
-          if (!res.ok) return;
+          if (!res.ok) {
+            triggerToast('⚠️ Übersetzungsdienst gerade nicht erreichbar (Tageslimit?) – Text bleibt unübersetzt');
+            return;
+          }
           const j = await res.json();
           const t = j?.responseData?.translatedText;
           if (t && String(j?.responseStatus) === '200' && t.trim() && !/MYMEMORY WARNING/i.test(t)) {
@@ -23024,8 +23066,12 @@ function App() {
                 [key]: t
               }
             }));
+          } else {
+            triggerToast('⚠️ Übersetzungsdienst gerade nicht erreichbar (Tageslimit?) – Text bleibt unübersetzt');
           }
-        } catch (_) {}
+        } catch (_) {
+          triggerToast('⚠️ Übersetzung fehlgeschlagen (keine Verbindung)');
+        }
       }, 1000);
     }
     // Merken: dieses Feld wurde digital (Tastatur) genutzt -> im Druck/Share anzeigen
@@ -35921,7 +35967,43 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     }
   }, "K")))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowLanguageDropdown(p => !p),
+    className: "flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-100 transition-colors",
+    title: `Sprache: ${SORTED_LANGUAGES.find(l => l.code === displayLanguage)?.name || 'Deutsch'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: ICONS.Globe,
+    size: 18,
+    className: "text-slate-500"
+  }), displayLanguage !== 'de' && /*#__PURE__*/React.createElement("span", {
+    className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-black text-white mix-blend-difference leading-none pointer-events-none"
+  }, displayLanguage.toUpperCase()))), showLanguageDropdown && /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-full right-0 mb-2 w-48 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "p-2 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase"
+  }, "Sprache wählen"), SORTED_LANGUAGES.map(lang => /*#__PURE__*/React.createElement("button", {
+    key: lang.code,
+    onClick: () => {
+      setDisplayLanguage(lang.code);
+      setShowLanguageDropdown(false);
+    },
+    className: `w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${displayLanguage === lang.code ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-100'}`
+  }, lang.name, displayLanguage === lang.code && /*#__PURE__*/React.createElement(Icon, {
+    d: ICONS.CheckCircle,
+    size: 14,
+    className: "ml-auto"
+  }))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAsonaModal(true),
+    className: "p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500 hover:bg-pink-50 hover:text-pink-600 transition-colors flex items-center justify-center",
+    title: "Asona myProtect (Geräteschutz)"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: ICONS.ShieldCheck,
+    size: 18
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: handleSaveButtonClick,
     disabled: offerSaving,
     className: "p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-emerald-500 hover:bg-emerald-50 transition-colors",
