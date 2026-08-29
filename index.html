@@ -4874,9 +4874,14 @@ const loadRowsFromFirebase = async (nurEigeneVon) => {
     // immer alle 2000 Datensätze (aller Kollegen/Kunden) geladen und nur in
     // der Oberfläche client-seitig ausgeblendet, was technisch versierten
     // Mitarbeitern trotzdem Einsicht in fremde Daten erlaubt hätte.
-    if (nurEigeneVon) q = db.collection('analytics').where('user', '==', nurEigeneVon).orderBy('ts', 'desc').limit(2000);
+    // Kein orderBy kombiniert mit where: würde einen Composite Index in
+    // Firestore erfordern (fehlt der, wirft die Query failed-precondition
+    // -> "nicht erreichbar" bei Mitarbeitern). Stattdessen client-seitig sortiert.
+    if (nurEigeneVon) q = db.collection('analytics').where('user', '==', nurEigeneVon).limit(2000);
     const snap = await q.get();
-    return snap.docs.map(d => d.data());
+    const rows = snap.docs.map(d => d.data());
+    if (nurEigeneVon) rows.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+    return rows;
   } catch (e) {
     console.warn('Firebase load failed:', e);
     return null;
