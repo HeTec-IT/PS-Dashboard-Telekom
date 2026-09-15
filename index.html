@@ -4910,8 +4910,16 @@ const migrateLegacyAnalyticsUids = async (db, analyticsDocs) => {
 // ── Alle Zeilen von Firebase laden (für Admin) ──
 const loadRowsFromFirebase = async (nurEigeneVon) => {
   try {
+    // Letzten Fehler vor jedem neuen Ladeversuch zurücksetzen. So kann die
+    // Oberfläche zwischen echter Nichterreichbarkeit und fehlenden Rechten
+    // unterscheiden, statt beides pauschal als "Firebase nicht erreichbar"
+    // anzuzeigen.
+    window.__statsLastErrorCode = '';
     const db = getStatsDb();
-    if (!db) return null;
+    if (!db) {
+      window.__statsLastErrorCode = 'firebase-init-failed';
+      return null;
+    }
     if (!nurEigeneVon) {
       const snap = await db.collection('analytics').orderBy('ts', 'desc').limit(2000).get();
       migrateLegacyAnalyticsUids(db, snap.docs);
@@ -4938,6 +4946,7 @@ const loadRowsFromFirebase = async (nurEigeneVon) => {
     return docs.map(d => d.data())
       .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
   } catch (e) {
+    window.__statsLastErrorCode = String(e && e.code || 'unknown');
     console.warn('Firebase load failed:', e);
     return null;
   }
@@ -14433,6 +14442,7 @@ const StatsModal = ({
   };
   const [fbRows, setFbRows] = useState(null);
   const [fbLoading, setFbLoading] = useState(false);
+  const [fbError, setFbError] = useState('');
   const [selectedAgent, setSelectedAgent] = useState(employeeMode ? lockedAgent || '__all__' : '__all__');
   const [activeTab, setActiveTab] = useState(employeeMode ? 'coaching' : 'uebersicht');
   const [skipAgentsData, setSkipAgentsData] = useState({}); // { agentName: {count, limit} }
@@ -14446,8 +14456,10 @@ const StatsModal = ({
   useEffect(() => {
     if (!isOpen) return;
     setFbLoading(true);
+    setFbError('');
     loadRowsFromFirebase(employeeMode ? (lockedAgent || LINK_EMPLOYEE) : null).then(data => {
       setFbRows(data);
+      setFbError(data === null ? String(window.__statsLastErrorCode || 'unknown') : '');
       setFbLoading(false);
     });
   }, [isOpen]);
@@ -14857,7 +14869,7 @@ const StatsModal = ({
       fontWeight: 500,
       marginTop: '1px'
     }
-  }, employeeMode ? fbLoading ? '⏳ Lade meine Daten...' : fbRows !== null ? `🔥 Deine Vorgänge · Live` : '⚠️ Firebase nicht erreichbar' : fbLoading ? '⏳ Lade Daten...' : fbRows !== null ? `🔥 ${rows.length} Vorgänge · Live` : '⚠️ Firebase nicht erreichbar'))), /*#__PURE__*/React.createElement("div", {
+  }, employeeMode ? fbLoading ? '⏳ Lade meine Daten...' : fbRows !== null ? `🔥 Deine Vorgänge · Live` : fbError === 'permission-denied' ? '⚠️ Keine Firebase-Berechtigung' : '⚠️ Firebase nicht erreichbar' : fbLoading ? '⏳ Lade Daten...' : fbRows !== null ? `🔥 ${rows.length} Vorgänge · Live` : fbError === 'permission-denied' ? '⚠️ Keine Firebase-Berechtigung' : '⚠️ Firebase nicht erreichbar'))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
