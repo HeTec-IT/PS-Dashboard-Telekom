@@ -4880,6 +4880,12 @@ const migrateLegacyAnalyticsUids = async (db, analyticsDocs) => {
       const data = doc.data() || {};
       const name = String(data.name || '').trim();
       if (!name) return;
+      // Bei mehrfacher Registrierung (z.B. Konto gelöscht & neu angelegt)
+      // existieren ggf. mehrere Profile mit demselben Namen. Nur das aktuell
+      // freigegebene Profil zählt - sonst ist die Namens-UID-Zuordnung nicht
+      // mehr eindeutig (ids.length!==1) und die Migration wird für diese
+      // Person stillschweigend komplett übersprungen.
+      if (data.status !== 'approved' || data.active !== true) return;
       const list = byName.get(name) || [];
       list.push(doc.id);
       byName.set(name, list);
