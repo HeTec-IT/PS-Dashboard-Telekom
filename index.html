@@ -188,7 +188,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.3';
+    window.APP_VERSION = '54.4';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -5468,6 +5468,22 @@ const STROKE_SIZES = [{
   width: 8,
   label: 'Dick'
 }];
+// v54.4: Dynamische Preiserhöhung – Beschriftung der Preisstufen ({r} = Monate vorher, {b} = Monat der Erhöhung)
+const PREIS_STUFE_TPL = {
+  de: ['MONATLICH MONAT {r} (€)', 'MONATLICH AB MONAT {b} (€)'],
+  en: ['MONTHLY, MONTHS {r} (€)', 'MONTHLY FROM MONTH {b} (€)'],
+  ru: ['ЕЖЕМЕСЯЧНО, МЕСЯЦЫ {r} (€)', 'ЕЖЕМЕСЯЧНО С {b}-ГО МЕСЯЦА (€)'],
+  uk: ['ЩОМІСЯЦЯ, МІСЯЦІ {r} (€)', 'ЩОМІСЯЦЯ З {b}-ГО МІСЯЦЯ (€)'],
+  ar: ['شهريًا، الأشهر {r} (€)', 'شهريًا من الشهر {b} (€)'],
+  el: ['ΜΗΝΙΑΙΑ, ΜΗΝΕΣ {r} (€)', 'ΜΗΝΙΑΙΑ ΑΠΟ ΤΟΝ {b}ο ΜΗΝΑ (€)'],
+  it: ['MENSILE, MESI {r} (€)', 'MENSILE DAL {b}° MESE (€)'],
+  pl: ['MIESIĘCZNIE, MIESIĄCE {r} (€)', 'MIESIĘCZNIE OD {b}. MIESIĄCA (€)'],
+  pt: ['MENSAL, MESES {r} (€)', 'MENSAL A PARTIR DO {b}.º MÊS (€)'],
+  ro: ['LUNAR, LUNILE {r} (€)', 'LUNAR DIN LUNA {b} (€)'],
+  es: ['MENSUAL, MESES {r} (€)', 'MENSUAL DESDE EL MES {b} (€)'],
+  tr: ['AYLIK, {r}. AYLAR (€)', 'AYLIK, {b}. AYDAN İTİBAREN (€)']
+};
+const PREIS_AB_SCHNELL = [4, 7, 13, 19];
 const MOCK_TRANSLATIONS = {
   ru: {
     Offer1Title: '1. Устройства, провайдер и использование',
@@ -19405,6 +19421,8 @@ function App() {
     } catch (e) {}
   }, []);
   const [showSecondYear, setShowSecondYear] = useState(false);
+  // v54.4: Monat, ab dem der 2. Preis gilt (13 = klassisch 2. Jahr)
+  const [preisAb, setPreisAb] = useState(13);
   // Druck-Option: AUS = klassische 2 Seiten, AN = Seite 3 mit Kosten + Empfehlungen
   const [printRecommendationsEnabled, setPrintRecommendationsEnabled] = useState(false);
   const [showGutschriftRechner, setShowGutschriftRechner] = useState(false);
@@ -20921,6 +20939,14 @@ function App() {
     if (displayLanguage === 'de') return STATIC_LABELS[key] || key;
     return staticTranslations[displayLanguage]?.[key] || MOCK_TRANSLATIONS[displayLanguage]?.[key] || STATIC_LABELS[key] || key;
   }, [staticTranslations, displayLanguage]);
+  const preisAbSafe = Math.max(2, Math.min(24, parseInt(preisAb, 10) || 13));
+  const getPreisStufeLabel = stufe => {
+    if (preisAbSafe === 13) return getStaticLabel(stufe === 1 ? 'CostMonatlich1' : 'CostMonatlich2');
+    const tpl = PREIS_STUFE_TPL[displayLanguage] || PREIS_STUFE_TPL.de;
+    const r = preisAbSafe - 1 === 1 ? '1' : '1–' + (preisAbSafe - 1);
+    return (stufe === 1 ? tpl[0] : tpl[1]).replace('{r}', r).replace('{b}', preisAbSafe);
+  };
+  const preisStufeKurz = stufe => preisAbSafe === 13 ? (stufe === 1 ? '1. Jahr' : '2. Jahr') : stufe === 1 ? (preisAbSafe === 2 ? 'Mon. 1' : 'Mon. 1–' + (preisAbSafe - 1)) : 'ab Mon. ' + preisAbSafe;
 
   // === 💾 ANGEBOTE SPEICHERN & LADEN ===
   const [showSavedOffers, setShowSavedOffers] = useState(false);
@@ -21076,6 +21102,7 @@ function App() {
       },
       packagePrices: JSON.parse(JSON.stringify(packagePrices)),
       showSecondYear,
+      preisAb,
       gutschriftBetrag,
       showSavingsBlock,
       showCostSection,
@@ -21095,7 +21122,7 @@ function App() {
       sitLayoutMode,
       offerLayoutMode
     };
-  }, [textData, drawnStrokes, emailText, beratungsId, view, customerType, providerSelect, customProvider, isCustomProvider, segment, canvasImages, canvasHtml, imageTransform, offerData, costState, packagePrices, showSecondYear, gutschriftBetrag, showSavingsBlock, showCostSection, checkedTechs, techUebernommen, netBundleMatched, wlanSnapshot, wlanRecommendation, speedRecommendation, followUpsByKey, customerSignature, displayLanguage, translatedText, staticTranslations, sitLayoutMode, offerLayoutMode]);
+  }, [textData, drawnStrokes, emailText, beratungsId, view, customerType, providerSelect, customProvider, isCustomProvider, segment, canvasImages, canvasHtml, imageTransform, offerData, costState, packagePrices, showSecondYear, preisAb, gutschriftBetrag, showSavingsBlock, showCostSection, checkedTechs, techUebernommen, netBundleMatched, wlanSnapshot, wlanRecommendation, speedRecommendation, followUpsByKey, customerSignature, displayLanguage, translatedText, staticTranslations, sitLayoutMode, offerLayoutMode]);
 
   // Angebot automatisch in die Cloud sichern (für "Kunde kommt zurück")
   const cloudAutoSaveCurrentOffer = useCallback(async () => {
@@ -21155,6 +21182,7 @@ function App() {
         },
         packagePrices: JSON.parse(JSON.stringify(packagePrices)),
         showSecondYear,
+        preisAb,
         gutschriftBetrag,
         showSavingsBlock,
         showCostSection,
@@ -21189,7 +21217,7 @@ function App() {
     setShowSaveDialog(false);
     setShowOverwriteDialog(false);
     setSaveDialogName('');
-  }, [textData, drawnStrokes, emailText, beratungsId, view, customerType, providerSelect, customProvider, isCustomProvider, segment, canvasImages, canvasHtml, imageTransform, offerData, costState, packagePrices, showSecondYear, gutschriftBetrag, showSavingsBlock, showCostSection, checkedTechs, techUebernommen, netBundleMatched, wlanSnapshot, wlanRecommendation, speedRecommendation, followUpsByKey, customerSignature, displayLanguage, translatedText, staticTranslations, sitLayoutMode, offerLayoutMode, triggerToast, loadOffersList]);
+  }, [textData, drawnStrokes, emailText, beratungsId, view, customerType, providerSelect, customProvider, isCustomProvider, segment, canvasImages, canvasHtml, imageTransform, offerData, costState, packagePrices, showSecondYear, preisAb, gutschriftBetrag, showSavingsBlock, showCostSection, checkedTechs, techUebernommen, netBundleMatched, wlanSnapshot, wlanRecommendation, speedRecommendation, followUpsByKey, customerSignature, displayLanguage, translatedText, staticTranslations, sitLayoutMode, offerLayoutMode, triggerToast, loadOffersList]);
 
   // v48.3: Speichern-Button gedrückt → prüfen ob diese Session schon gespeichert wurde
   const handleSaveButtonClick = useCallback(() => {
@@ -21241,6 +21269,7 @@ function App() {
       if (offer.costState) setCostState(offer.costState);
       if (offer.packagePrices) setPackagePrices(offer.packagePrices);
       if (offer.showSecondYear != null) setShowSecondYear(offer.showSecondYear);
+      setPreisAb(offer.preisAb != null ? offer.preisAb : 13);
       if (offer.gutschriftBetrag != null) setGutschriftBetrag(offer.gutschriftBetrag);
       if (offer.showSavingsBlock != null) setShowSavingsBlock(offer.showSavingsBlock);
       if (offer.showCostSection != null) setShowCostSection(offer.showCostSection);
@@ -24639,9 +24668,9 @@ function App() {
       [key]: isNaN(val) || value.trim() === '' ? 0 : val
     }));
   };
-  const renderOfferInput = (key, labelKey, type = 'text') => {
+  const renderOfferInput = (key, labelKey, type = 'text', labelOverride = null) => {
     let ref, rawValue, strokesKey;
-    const label = getStaticLabel(labelKey);
+    const label = labelOverride || getStaticLabel(labelKey);
     if (key === 'einmalig' || key === 'monatlich1' || key === 'monatlich2' || key === 'smartphone') {
       ref = key === 'einmalig' ? offerCost1Ref : key === 'monatlich1' ? offerCost2Ref : key === 'monatlich2' ? offerCost3Ref : offerCostSmartphoneRef;
       rawValue = offerData[`${key}Raw`] ?? '';
@@ -33947,7 +33976,8 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     const current = gesamtkostenVal > 0 ? gesamtkostenVal : totalCost;
     const saving = current > 0 && monthly > 0 ? current - monthly : 0;
     const saving2 = current > 0 && monthly2 > 0 ? current - monthly2 : null;
-    const savingYear = saving * 12;
+    const abJahr = showSecondYear && saving2 !== null ? Math.min(13, preisAbSafe) : 13;
+    const savingYear = saving * (abJahr - 1) + (abJahr < 13 ? saving2 * (13 - abJahr) : 0);
     const hasPotentialSaving = monthly > 0 && current > 0;
     // Nur anzeigen wenn User explizit "Ja" geklickt hat
     const hasSaving = saving > 0.005 && offerLayoutMode !== 'step' && showSavingsBlock;
@@ -34191,7 +34221,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         background: 'rgba(0,0,0,0.2)',
         borderRadius: '999px'
       }
-    }, saving2 > 0 ? `2. Jahr: ${saving2.toFixed(2).replace('.', ',')} €/Mo` : `2. Jahr: +${Math.abs(saving2).toFixed(2).replace('.', ',')} € teurer`))), /*#__PURE__*/React.createElement("a", {
+    }, saving2 > 0 ? `${preisStufeKurz(2)}: ${saving2.toFixed(2).replace('.', ',')} €/Mo` : `${preisStufeKurz(2)}: +${Math.abs(saving2).toFixed(2).replace('.', ',')} € teurer`))), /*#__PURE__*/React.createElement("a", {
       href: `https://www.o2online.de/e-shop/handys-ohne-vertrag?ohne-tarif=ja`,
       target: "_blank",
       rel: "noopener noreferrer",
@@ -34956,9 +34986,9 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     className: "text-blue-600"
   }), " ", getStaticLabel('CostHeader')), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-4 mt-4 cost-grid-years"
-  }, renderOfferInput('einmalig', 'CostEinmalig', 'text'), renderOfferInput('monatlich1', showSecondYear ? 'CostMonatlich1' : 'CostMonatlich', 'text'), /*#__PURE__*/React.createElement("div", {
+  }, renderOfferInput('einmalig', 'CostEinmalig', 'text'), renderOfferInput('monatlich1', showSecondYear ? 'CostMonatlich1' : 'CostMonatlich', 'text', showSecondYear ? getPreisStufeLabel(1) : null), /*#__PURE__*/React.createElement("div", {
     className: `year-2-container ${!showSecondYear ? 'hidden-layer' : ''}`
-  }, renderOfferInput('monatlich2', 'CostMonatlich2', 'text'))), /*#__PURE__*/React.createElement("div", {
+  }, renderOfferInput('monatlich2', 'CostMonatlich2', 'text', getPreisStufeLabel(2)))), /*#__PURE__*/React.createElement("div", {
     className: "mt-3"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -35062,7 +35092,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         fontWeight: 600,
         fontSize: '10px'
       }
-    }, "1. Jahr"), /*#__PURE__*/React.createElement("span", {
+    }, showSecondYear ? preisStufeKurz(1) : "1. Jahr"), /*#__PURE__*/React.createElement("span", {
       style: {
         color: '#1d4ed8',
         fontFamily: 'monospace'
@@ -35115,7 +35145,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         fontWeight: 600,
         fontSize: '10px'
       }
-    }, "2. Jahr"), /*#__PURE__*/React.createElement("span", {
+    }, preisStufeKurz(2)), /*#__PURE__*/React.createElement("span", {
       style: {
         color: '#1d4ed8',
         fontFamily: 'monospace'
@@ -35184,9 +35214,26 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     onClick: () => setShowSecondYear(v => !v)
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-slate-600 uppercase tracking-wider"
-  }, getStaticLabel('CostMonatlich2')), /*#__PURE__*/React.createElement("span", {
+  }, getPreisStufeLabel(2)), /*#__PURE__*/React.createElement("span", {
     className: "w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-black text-lg leading-none"
-  }, showSecondYear ? '−' : '+'))), /*#__PURE__*/React.createElement("div", {
+  }, showSecondYear ? '−' : '+')), showSecondYear && (() => {
+    const MAG = '#E20074';
+    const chipStyle = act => ({ minWidth: '40px', height: '34px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid ' + (act ? MAG : '#fbcfe8'), background: act ? MAG : '#fff', color: act ? '#fff' : MAG, fontWeight: 800, fontSize: '13px' });
+    const stepBtn = { width: '34px', height: '34px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#334155', fontWeight: 900, fontSize: '16px', lineHeight: 1 };
+    const setAb = v => setPreisAb(Math.max(2, Math.min(24, v)));
+    return /*#__PURE__*/React.createElement("div", {
+      className: "no-print",
+      style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginTop: '8px', padding: '8px 10px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '12px' }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: '11px', fontWeight: 800, color: MAG, textTransform: 'uppercase', letterSpacing: '.04em', marginRight: '4px' }
+    }, "Preiserhöhung ab Monat"), PREIS_AB_SCHNELL.map(m => /*#__PURE__*/React.createElement("button", {
+      key: m, type: "button", onClick: () => setAb(m), style: chipStyle(preisAbSafe === m)
+    }, m)), /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }
+    }, /*#__PURE__*/React.createElement("button", { type: "button", style: stepBtn, onClick: () => setAb(preisAbSafe - 1) }, "−"), /*#__PURE__*/React.createElement("span", {
+      style: { minWidth: '34px', textAlign: 'center', fontWeight: 900, fontSize: '16px', color: '#0f172a' }
+    }, preisAbSafe), /*#__PURE__*/React.createElement("button", { type: "button", style: stepBtn, onClick: () => setAb(preisAbSafe + 1) }, "+")));
+  })()), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
   }, renderOfferInput('agent', 'AgentLabel', 'text'), renderOfferInput('datum', 'DateLabel', 'text'), renderOfferInput('gueltig', 'ValidUntilLabel', 'date'), /*#__PURE__*/React.createElement("div", {
     className: "col-span-2"
