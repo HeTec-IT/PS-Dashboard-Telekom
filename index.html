@@ -4243,6 +4243,20 @@ body.pdf-share-mode .offer-canvas-container:has(.offer-html-overlay-wrap) .offer
   z-index: 9999 !important;
 }
 </style>
+<style id="ps-edge-swipe-fix">
+html, body, #root { overscroll-behavior: none !important; overscroll-behavior-x: none !important; -webkit-overflow-scrolling: auto; }
+body { position: fixed; inset: 0; width: 100%; }
+</style>
+<script id="ps-back-guard">
+(function () {
+  // Zurück-/Randwisch-Geste (Android/iPad) darf die installierte App nicht schließen
+  var standalone = (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches)) || window.navigator.standalone === true;
+  if (!standalone || !window.history || !history.pushState) return;
+  function arm() { try { history.pushState({ psGuard: true }, '', location.href); } catch (e) {} }
+  arm(); arm();
+  window.addEventListener('popstate', function () { arm(); });
+})();
+</script>
 </head>
 <body>
     <div id="root"></div>
