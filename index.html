@@ -135,12 +135,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.3';
+        manifestLink.href = 'manifest.webmanifest?v=54.5';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.3').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.5').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -248,6 +248,8 @@
     (function () {
         try {
             var standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                              window.matchMedia('(display-mode: fullscreen)').matches ||
+                              window.matchMedia('(display-mode: minimal-ui)').matches ||
                               window.navigator.standalone === true;
             if (!standalone || !window.history || !history.pushState) return;
         } catch (e) { return; }
@@ -313,7 +315,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.4';
+    window.APP_VERSION = '54.5';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -21518,11 +21520,40 @@ function App() {
         // TV-Paket Auswahl
         canvasImages,
         // Bilder in Canvases
-        imageTransform // Bild-Positionen
+        imageTransform, // Bild-Positionen
+        // v54.5: weitere Felder, damit nach der Wiederherstellung nichts fehlt
+        customProvider,
+        isCustomProvider,
+        checkedTechs,
+        followUpsByKey,
+        displayLanguage,
+        translatedText,
+        staticTranslations,
+        preisAb,
+        showSecondYear,
+        gutschriftBetrag,
+        gutschriftManuell,
+        gutschriftRateManuell,
+        showSavingsBlock,
+        dismissSavingsHint,
+        showCostSection,
+        sitLayoutMode,
+        offerLayoutMode,
+        segmentTouched,
+        view
       };
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snap));
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snap));
+      } catch (e2) {
+        // Gerätespeicher knapp: wenigstens Texte und Handschrift retten.
+        try {
+          localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ...snap, reduced: true, customerSignature: null,
+            canvasImages: { offer1: null, offer2: null, offer3: null },
+            canvasHtml: { offer1: null, offer2: null, offer3: null } }));
+        } catch (_) {}
+      }
     } catch (e) {}
-  }, [textData, drawnStrokes, customerType, segment, packagePrices, providerSelect, costState, offerData, canvasStatus, wlanRecommendation, speedRecommendation, emailText, beratungsId, skipReason, customerSignature, canvasHtml, wlanSnapshot, techUebernommen, netBundleMatched, tvSnapshot, canvasImages, imageTransform]);
+  }, [textData, drawnStrokes, customerType, segment, packagePrices, providerSelect, costState, offerData, canvasStatus, wlanRecommendation, speedRecommendation, emailText, beratungsId, skipReason, customerSignature, canvasHtml, wlanSnapshot, techUebernommen, netBundleMatched, tvSnapshot, canvasImages, imageTransform, customProvider, isCustomProvider, checkedTechs, followUpsByKey, displayLanguage, translatedText, staticTranslations, preisAb, showSecondYear, gutschriftBetrag, gutschriftManuell, gutschriftRateManuell, showSavingsBlock, dismissSavingsHint, showCostSection, sitLayoutMode, offerLayoutMode, segmentTouched, view]);
   const clearAutosave = () => {
     try {
       localStorage.removeItem(AUTOSAVE_KEY);
@@ -21584,18 +21615,45 @@ function App() {
     }
   }, []);
   React.useEffect(() => {
-    autosaveTimerRef.current = setInterval(saveToAutosave, 30000);
+    autosaveTimerRef.current = setInterval(() => { if (document.visibilityState !== 'hidden') saveToAutosave(); }, 30000);
     return () => clearInterval(autosaveTimerRef.current);
+  }, [saveToAutosave]);
+  // v54.5: Sofort sichern, sobald die App in den Hintergrund geht (App-Wechsel,
+  // Home-Taste). So zaehlen die 5 Minuten ab dem Verlassen der App.
+  React.useEffect(() => {
+    const saveNow = () => { try { saveToAutosave(); } catch (e) {} };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') saveNow(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', saveNow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', saveNow);
+    };
   }, [saveToAutosave]);
   React.useEffect(() => {
     if (autosaveRestoredRef.current) return;
     autosaveRestoredRef.current = true;
-    // v56: Das alte "Sitzung wiederherstellen"-Banner oben rechts wird NICHT
-    // mehr angezeigt. Es ist durch das untere 💾-System (Speichern/Angebote)
-    // ersetzt. Der Autosave läuft im Hintergrund weiter (Schutz bei Reload),
-    // aber das aufdringliche Banner entfällt.
+    // v54.5: Innerhalb von 5 Minuten wird die Sitzung still und automatisch
+    // wiederhergestellt (kein Banner/Button). Aelter als 5 Minuten -> verwerfen.
+    let raw = null;
+    try { raw = localStorage.getItem(AUTOSAVE_KEY); } catch (_) {}
+    if (!raw) return;
+    try {
+      const snap = JSON.parse(raw);
+      const fresh = snap && snap.ts && Date.now() - snap.ts < 5 * 60 * 1000;
+      const hasContent = !!(snap?.customerSignature || snap?.emailText ||
+        Object.values(snap?.textData || {}).some(v => String(v || '').trim()) ||
+        Object.values(snap?.drawnStrokes || {}).some(v => Array.isArray(v) && v.length));
+      if (fresh && hasContent) {
+        setTimeout(() => { try { handleRestoreAutosave(true); } catch (_) {} }, 700);
+      } else {
+        clearAutosave();
+      }
+    } catch (_) {
+      clearAutosave();
+    }
   }, []);
-  const handleRestoreAutosave = () => {
+  const handleRestoreAutosave = (silent) => {
     try {
       const snap = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || '{}');
       if (snap.textData) {
@@ -21638,11 +21696,29 @@ function App() {
       if (snap.tvSnapshot) setTvSnapshot(snap.tvSnapshot);
       if (snap.canvasImages) setCanvasImages(snap.canvasImages);
       if (snap.imageTransform) setImageTransform(snap.imageTransform);
+      if (snap.customProvider !== undefined) setCustomProvider(snap.customProvider);
+      if (snap.isCustomProvider !== undefined) setIsCustomProvider(snap.isCustomProvider);
+      if (snap.checkedTechs) setCheckedTechs(snap.checkedTechs);
+      if (snap.followUpsByKey) setFollowUpsByKey(snap.followUpsByKey);
+      if (snap.displayLanguage) setDisplayLanguage(snap.displayLanguage);
+      if (snap.translatedText) setTranslatedText(snap.translatedText);
+      if (snap.staticTranslations) setStaticTranslations(snap.staticTranslations);
+      if (snap.preisAb != null) setPreisAb(snap.preisAb);
+      if (snap.showSecondYear !== undefined) setShowSecondYear(snap.showSecondYear);
+      if (snap.gutschriftBetrag !== undefined) setGutschriftBetrag(snap.gutschriftBetrag);
+      if (snap.gutschriftManuell !== undefined) setGutschriftManuell(snap.gutschriftManuell);
+      if (snap.gutschriftRateManuell !== undefined) setGutschriftRateManuell(snap.gutschriftRateManuell);
+      if (snap.showSavingsBlock !== undefined) setShowSavingsBlock(snap.showSavingsBlock);
+      if (snap.dismissSavingsHint !== undefined) setDismissSavingsHint(snap.dismissSavingsHint);
+      if (snap.showCostSection !== undefined) setShowCostSection(snap.showCostSection);
+      if (snap.sitLayoutMode) setSitLayoutMode(snap.sitLayoutMode);
+      if (snap.offerLayoutMode) setOfferLayoutMode(snap.offerLayoutMode);
+      if (snap.view) setView(snap.view);
       // v56: Robuste Wiederherstellung statt fester Timer – zeichnet,
       // bis die Tinte tatsächlich sichtbar ist (s. forceRestoreRedraw).
       forceRestoreRedraw(snap.drawnStrokes);
       setShowRestoreToast(false);
-      triggerToast('✅ Sitzung wiederhergestellt!');
+      if (silent !== true) triggerToast('✅ Sitzung wiederhergestellt!');
     } catch (e) {
       triggerToast('Wiederherstellung fehlgeschlagen.');
     }
@@ -30080,16 +30156,16 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     }
   }, "AUTO")), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: 700,
-      color: '#cbd5e1',
+      color: '#64748b',
       letterSpacing: '0.05em',
       userSelect: 'none',
       pointerEvents: 'none',
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.3"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.5"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
