@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+    <!-- Datenschutz: alte markenuebergreifende Sicherung sofort entfernen, auch vor Login. -->
+    <script>try { localStorage.removeItem('ps_autosave_v1'); } catch (_) {}</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- ══════════════════════════════════════════════════════════════════════
@@ -135,12 +137,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.7';
+        manifestLink.href = 'manifest.webmanifest?v=54.7.1';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.7').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.7.1').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -258,18 +260,21 @@
         var exitBtn = null;
         var endEl = null;
         var dialogVisible = false;
+        var endRefreshTimer = null;
         var previousFocus = null;
         var accent = '#c21869';
 
-        // Endzeit der automatischen Wiederherstellung (Date.now() + 5 Min., minutengenau
-        // abgerundet - die angezeigte Zeit liegt nie NACH dem echten Fristende).
+        // Noch keine Frist im Dialog: Diese beginnt erst beim tatsaechlichen Verlassen.
+        // Deshalb nur die laufend aktualisierte VORAUSSICHTLICHE Endzeit zeigen.
         function restoreEndText() {
-            var ms = window.__PS_RESTORE_WINDOW_MS || 300000;
+            var configured = Number(window.__PS_RESTORE_WINDOW_MS);
+            var ms = Number.isFinite(configured) && configured > 0 ? configured : 300000;
             var end = new Date(Date.now() + ms);
             var hh = ('0' + end.getHours()).slice(-2);
             var mm = ('0' + end.getMinutes()).slice(-2);
-            return 'Deine Beratung bleibt vorübergehend gespeichert. ' +
-                   'Automatische Wiederherstellung möglich bis ' + hh + ':' + mm + ' Uhr.';
+            var ss = ('0' + end.getSeconds()).slice(-2);
+            return 'Bei Verlassen jetzt: Wiederherstellung voraussichtlich bis ' +
+                   hh + ':' + mm + ':' + ss + ' Uhr. Die 5 Minuten starten erst beim tatsächlichen Verlassen.';
         }
         function pushGuard() {
             try { history.pushState({ psBackGuard: 1 }, '', location.href); } catch (e) {}
@@ -277,6 +282,7 @@
         function hideDialog() {
             if (!overlay) return;
             dialogVisible = false;
+            if (endRefreshTimer) { clearInterval(endRefreshTimer); endRefreshTimer = null; }
             overlay.style.display = 'none';
             if (exitBtn) exitBtn.style.display = '';
             try {
@@ -286,6 +292,7 @@
             } catch (e) {}
         }
         function tryExit() {
+            if (endEl) endEl.textContent = restoreEndText();
             // window.close() funktioniert nur, wenn der Browser das Schliessen erlaubt.
             // Andernfalls bewahren wir die Beratung und zeigen den sicheren Home-Weg.
             try { window.close(); } catch (e) {}
@@ -296,7 +303,7 @@
                         'Android erlaubt es dieser Browser-App nicht, sich selbst zu schließen. ' +
                         'Bitte nutze die Home-Geste, um die App zu verlassen. Die 5-Minuten-Wiederherstellung bleibt aktiv.';
                 }
-                if (endEl) endEl.textContent = restoreEndText() + ' Die Frist beginnt, sobald du die App wirklich verlässt.';
+                if (endEl) endEl.textContent = restoreEndText();
                 if (exitBtn) exitBtn.style.display = 'none';
                 if (continueBtn) continueBtn.focus();
             }, 400);
@@ -366,6 +373,12 @@
             exitBtn.style.display = '';
             dialogVisible = true;
             overlay.style.display = 'flex';
+            if (endRefreshTimer) clearInterval(endRefreshTimer);
+            endRefreshTimer = setInterval(function () {
+                if (dialogVisible && endEl && document.visibilityState !== 'hidden') {
+                    endEl.textContent = restoreEndText();
+                }
+            }, 1000);
             try { continueBtn.focus({ preventScroll: true }); } catch (e) {}
         }
         function onBack() {
@@ -435,7 +448,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.7';
+    window.APP_VERSION = '54.7.1';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -21909,6 +21922,14 @@ function App() {
         clearAutosave();
         throw new Error('Sicherung gehört zu einem anderen Benutzer');
       }
+      // Abgelaufene Sicherungen auch beim verzoegerten/manuellen Laden ablehnen.
+      const savedAt = Number(snap.ts);
+      const restoreWindow = window.__PS_RESTORE_WINDOW_MS || 5 * 60 * 1000;
+      if (!Number.isFinite(savedAt) || savedAt <= 0 ||
+          savedAt > Date.now() || Date.now() - savedAt >= restoreWindow) {
+        clearAutosave();
+        throw new Error('Sicherung aelter als 5 Minuten');
+      }
       if (snap.textData) {
         // v56 FIX: Agent-Name aus dem Link hat IMMER Vorrang (Ronny-Bug).
         const restored = {
@@ -30435,7 +30456,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.7"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.7.1"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
