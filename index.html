@@ -16982,6 +16982,69 @@ const redrawCanvas = (canvas, strokes, scaleFactor = 1, key = '') => {
     }
   }
 };
+
+// === Radierer v2 (Samsung-Notes-Feel): ganze Striche per Treffertest entfernen ===
+function __psDistToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1,
+    dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx,
+    cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+function strokeHitByEraser(stroke, x, y, radius) {
+  if (!stroke || !stroke.points || stroke.points.length === 0) return false;
+  const pad = radius + (stroke.baseLineWidth != null ? stroke.baseLineWidth / 2 : (stroke.width || 2) / 2);
+  const pts = stroke.points;
+  if (pts.length === 1) {
+    return Math.hypot(x - pts[0].x, y - pts[0].y) <= pad;
+  }
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (__psDistToSegment(x, y, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= pad) return true;
+  }
+  return false;
+}
+// v55.1.0: Radieren wie auf Papier – nur die vom Radiergummi tatsächlich
+// getroffenen Punkte werden entfernt, nicht der ganze Strich. Ein einmaliges
+// Antippen löscht also nicht mehr alles; man muss wirklich über den Strich
+// ziehen, bis er komplett weg ist. Rückgabe: null = nichts getroffen (Strich
+// bleibt wie er ist), Array = Ersatz für den Strich (ggf. leer = komplett weg,
+// oder mehrere Teilstücke, wenn mittendrin radiert wurde).
+function eraseStrokeAt(stroke, x, y, radius) {
+  if (!stroke || !stroke.points || stroke.points.length === 0) return null;
+  const pad = radius + (stroke.baseLineWidth != null ? stroke.baseLineWidth / 2 : (stroke.width || 2) / 2);
+  const pts = stroke.points;
+  let anyHit = false;
+  const segments = [];
+  let current = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (Math.hypot(pts[i].x - x, pts[i].y - y) <= pad) {
+      anyHit = true;
+      if (current.length >= 2) segments.push(current);
+      current = [];
+    } else {
+      current.push(pts[i]);
+    }
+  }
+  if (!anyHit) return null;
+  if (current.length >= 2) segments.push(current);
+  return segments.map(segPts => Object.assign({}, stroke, {
+    points: segPts
+  }));
+}
+function forceRedrawCanvas(canvas, strokes, scaleFactor, key) {
+  // Wie redrawCanvas, ignoriert aber kurzzeitig die __activeDrawingCanvas-Sperre,
+  // damit der Radierer live (während des Ziehens) sichtbares Feedback zeigt.
+  const prevActive = window.__activeDrawingCanvas;
+  if (prevActive === canvas) window.__activeDrawingCanvas = null;
+  try {
+    redrawCanvas(canvas, strokes, scaleFactor, key);
+  } finally {
+    window.__activeDrawingCanvas = prevActive;
+  }
+}
 const OfferCanvas = React.memo(({
   canvasRef,
   label,
@@ -19647,6 +19710,11 @@ function App() {
   const eraserSizeRef = useRef(4);
   const opacityRef = useRef(0.85);
   const colorRef = useRef('#0044ff');
+  const drawnStrokesRef = useRef(drawnStrokes);
+  useEffect(() => {
+    drawnStrokesRef.current = drawnStrokes;
+  }, [drawnStrokes]);
+  const eraserSessionRef = useRef(null); // Radierer v2: laufende Löschsitzung (Samsung-Notes-Feel)
 
   // --- Tool helpers (Pen / Fountain / Ballpen) ---
   const resolveToolForPointer = (selectedTool, pointerType) => {
@@ -23989,6 +24057,38 @@ function App() {
     const widthScale = isCostCanvas ? 0.55 : 1.0;
     const finalLineWidth = visualBaseW / zoomLevel * widthScale;
 
+    // === Radierer v2 (Samsung-Notes-Feel): ganze Striche live entfernen statt Pixel wegkratzen ===
+    if (currentTool === 'eraser' && key) {
+      const eraserRadius = finalLineWidth * (eraserSizeRef.current || 4) / 2;
+      const working = (drawnStrokesRef.current[key] || []).slice();
+      let changed = false;
+      for (let i = working.length - 1; i >= 0; i--) {
+        const s = working[i];
+        if (!s || s.tool === 'eraser') continue;
+        const erased = eraseStrokeAt(s, x, y, eraserRadius);
+        if (erased) {
+          working.splice(i, 1, ...erased);
+          changed = true;
+        }
+      }
+      try {
+        if (canvas.setPointerCapture && e.pointerId != null) canvas.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      window.__activeDrawingCanvas = canvas;
+      eraserSessionRef.current = {
+        key,
+        canvas,
+        radius: eraserRadius,
+        working,
+        lastX: x,
+        lastY: y
+      };
+      isDrawingRef.current = true;
+      currentStrokeRef.current = null;
+      if (changed) forceRedrawCanvas(canvas, working, 1, key);
+      return;
+    }
+
     // === v44.0 TINTEN-ENGINE: Startbreite aus echtem Stylus-Druck ===
     const dynStart = currentTool !== 'eraser' && currentTool !== 'highlighter' ? getInkToolDynamics(currentTool) : null;
     const pressure = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5;
@@ -24077,6 +24177,65 @@ function App() {
       return;
     }
     if (gestureModeRef.current && pointerType === 'touch') return;
+
+    // === Radierer v2: während des Ziehens live weiterlöschen (keine Freigabe nötig) ===
+    if (eraserSessionRef.current && isDrawingRef.current) {
+      e.preventDefault();
+      const session = eraserSessionRef.current;
+      const nativeEv = e.nativeEvent || e;
+      let events = [nativeEv];
+      try {
+        if (nativeEv.getCoalescedEvents) {
+          const coalesced = nativeEv.getCoalescedEvents();
+          if (coalesced && coalesced.length > 0) events = coalesced;
+        }
+      } catch (_) {}
+      let changed = false;
+      for (const ev of events) {
+        const {
+          x: cssX,
+          y: cssY
+        } = getRelativeCoords(ev, canvas) || {};
+        if (cssX == null || cssY == null) continue;
+        // Zwischenpunkte abtasten, damit schnelle Züge keine Striche überspringen
+        const dist = Math.hypot(cssX - session.lastX, cssY - session.lastY);
+        const steps = Math.max(1, Math.ceil(dist / Math.max(4, session.radius / 2)));
+        for (let s = 1; s <= steps; s++) {
+          const ix = session.lastX + (cssX - session.lastX) * (s / steps);
+          const iy = session.lastY + (cssY - session.lastY) * (s / steps);
+          for (let i = session.working.length - 1; i >= 0; i--) {
+            const st2 = session.working[i];
+            if (!st2 || st2.tool === 'eraser') continue;
+            const erased = eraseStrokeAt(st2, ix, iy, session.radius);
+            if (erased) {
+              session.working.splice(i, 1, ...erased);
+              changed = true;
+            }
+          }
+        }
+        session.lastX = cssX;
+        session.lastY = cssY;
+      }
+      // v54.2.0: Repaint auf max. 1x/Frame drosseln (rAF) – der Treffertest läuft
+      // weiter bei jedem Move (kein übersprungener Strich), nur das teure Neuzeichnen
+      // wird gebündelt. Vorher lief bei jedem Pointer-Move ein voller Redraw, wodurch
+      // der Browser während des Ziehens nie zum Malen kam (Bild sprang erst beim
+      // Loslassen auf den Endzustand statt Strich für Strich live zu verschwinden).
+      if (changed) {
+        session.dirty = true;
+        if (!session.rafPending) {
+          session.rafPending = true;
+          requestAnimationFrame(() => {
+            session.rafPending = false;
+            if (session.dirty && eraserSessionRef.current === session) {
+              session.dirty = false;
+              forceRedrawCanvas(session.canvas, session.working, 1, session.key);
+            }
+          });
+        }
+      }
+      return;
+    }
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     e.preventDefault();
 
@@ -24261,6 +24420,26 @@ function App() {
           }, PEN_GRACE_MS + 30);
         } catch (_) {}
       }
+    }
+
+    // === Radierer v2: Sitzung abschließen – reduzierte Strichliste committen ===
+    if (eraserSessionRef.current) {
+      const session = eraserSessionRef.current;
+      eraserSessionRef.current = null;
+      isDrawingRef.current = false;
+      currentStrokeRef.current = null;
+      window.__activeDrawingCanvas = null;
+      if (session.key) {
+        setDrawnStrokes(prev => ({
+          ...prev,
+          [session.key]: session.working
+        }));
+        if (session.key.startsWith('offer')) {
+          setRedrawCounter(r => r + 1);
+        }
+      }
+      if (session.canvas) forceRedrawCanvas(session.canvas, session.working, 1, session.key);
+      return;
     }
     // pointercancel: immer alle Locks freigeben (z.B. bei Systemgeste)
     if (e && e.type === 'pointercancel') {
@@ -37212,9 +37391,11 @@ function __psRenderAuth(mode, prefill) {
         '<div class="flex gap-1 bg-slate-100 rounded-lg p-1 mb-4">' + tabBtn('login', 'Anmelden') + tabBtn('register', 'Registrieren') + '</div>' +
         '<div id="ps-gate-msg" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-3"></div>' +
         formHtml +
+        __psKanalFooterHtml() +
       '</div>' +
     '</div>'
   );
+  __psKanalAttachChange();
 
   Array.prototype.forEach.call(document.querySelectorAll('.ps-tab'), function (btn) {
     btn.onclick = function () {
@@ -37308,6 +37489,103 @@ function __psRenderAuth(mode, prefill) {
       });
     };
   }
+}
+// Kanalwahl (einmalig pro Gerät, VOR der Anmeldung): Telekom / o2 / Freier Fachhandel.
+// Der Schlüssel ist bewusst für beide Apps gleich (gleiche Domain): wer einmal gewählt hat, wird in beiden Apps richtig geführt.
+// Passt der gewählte Kanal nicht zu dieser App, wird zur richtigen App weitergeleitet. Freier Fachhandel nutzt vorerst die o2-App.
+var __PS_KANAL_KEY = 'hetec_kanal';
+var __PS_KANAL_SELF = 'telekom';
+var __PS_KANAL_URLS = { telekom: 'https://hetec-it.github.io/PS-Dashboard-Telekom/', o2: 'https://hetec-it.github.io/PS-Dashboard/', fachhandel: 'https://hetec-it.github.io/PS-Dashboard/' };
+var __PS_KANAL_TILES = [
+  { id: 'telekom', label: 'Telekom', sub: 'Telekom-Shop', glyph: 'T', color: '#E20074', dark: '#a8004f' },
+  { id: 'o2', label: 'o2', sub: 'o2-Shop', glyph: 'o2', color: '#0019a5', dark: '#000f66' },
+  { id: 'fachhandel', label: 'Freier Fachhandel', sub: 'Händler ohne Shop-Marke', glyph: 'FH', color: '#6b7280', dark: '#374151' }
+];
+
+function __psKanalGet() {
+  try {
+    var v = localStorage.getItem(__PS_KANAL_KEY);
+    return (v === 'telekom' || v === 'o2' || v === 'fachhandel') ? v : '';
+  } catch (e) { return ''; }
+}
+
+function __psKanalSet(k) { try { localStorage.setItem(__PS_KANAL_KEY, k); } catch (e) {} }
+
+function __psKanalApp(k) { return k === 'telekom' ? 'telekom' : 'o2'; }
+
+function __psKanalTile(k) {
+  for (var i = 0; i < __PS_KANAL_TILES.length; i++) if (__PS_KANAL_TILES[i].id === k) return __PS_KANAL_TILES[i];
+  return null;
+}
+
+// Gehört der Kanal zu dieser App? Sonst zur richtigen App weiterleiten (nur wenn deren Adresse bekannt ist).
+function __psKanalRoute(k, next) {
+  var url = __PS_KANAL_URLS[k];
+  if (__psKanalApp(k) !== __PS_KANAL_SELF && url) {
+    __psGateRender('<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f1f5f9;padding:16px;font-family:inherit;color:#334155">Weiterleitung …</div>');
+    window.location.replace(url);
+    return;
+  }
+  next();
+}
+
+function __psKanalGate(next) {
+  var k = __psKanalGet();
+  if (k) { __psKanalRoute(k, next); return; }
+  var tiles = '';
+  for (var i = 0; i < __PS_KANAL_TILES.length; i++) {
+    var t = __PS_KANAL_TILES[i];
+    tiles += '<button type="button" class="ps-kanal-tile" data-kanal="' + t.id + '" aria-label="' + t.label + '" style="background-color:' + t.color + ';background-image:linear-gradient(135deg,' + t.color + ' 0%,' + t.dark + ' 100%)">' +
+      '<span class="ps-kanal-badge">' + t.glyph + '</span>' +
+      '<span class="ps-kanal-text"><span class="ps-kanal-title">' + t.label + '</span><span class="ps-kanal-sub">' + t.sub + '</span></span>' +
+      '<span class="ps-kanal-arrow" aria-hidden="true">›</span>' +
+    '</button>';
+  }
+  __psGateRender(
+    '<style>' +
+      '.ps-kanal-grid{display:grid;grid-template-columns:1fr;gap:14px}' +
+      '.ps-kanal-tile{display:flex;align-items:center;gap:14px;width:100%;min-height:92px;text-align:left;border:0;border-radius:20px;padding:16px 18px;color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,.18);transition:transform .12s ease,box-shadow .12s ease;font-family:inherit}' +
+      '.ps-kanal-tile:hover{box-shadow:0 12px 26px rgba(15,23,42,.26);transform:translateY(-2px)}' +
+      '.ps-kanal-tile:active{transform:scale(.98)}' +
+      '.ps-kanal-badge{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.2);font-size:24px;font-weight:800;letter-spacing:-.5px}' +
+      '.ps-kanal-text{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}' +
+      '.ps-kanal-title{font-size:20px;font-weight:800;line-height:1.2}' +
+      '.ps-kanal-sub{font-size:13px;opacity:.85}' +
+      '.ps-kanal-arrow{flex:0 0 auto;font-size:34px;line-height:1;opacity:.8}' +
+      '@media (min-width:720px){.ps-kanal-grid{grid-template-columns:repeat(3,1fr)}.ps-kanal-tile{flex-direction:column;align-items:flex-start;min-height:190px;justify-content:center}.ps-kanal-text{flex:0 0 auto}.ps-kanal-arrow{display:none}}' +
+    '</style>' +
+    '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f1f5f9;padding:16px;font-family:inherit">' +
+      '<div style="width:100%;max-width:780px">' +
+        '<h1 style="font-size:26px;font-weight:800;color:#0f172a;margin:0 0 6px 0;text-align:center">Pencil Selling</h1>' +
+        '<p style="margin:0 0 22px 0;color:#475569;font-size:15px;text-align:center">Für welchen Kanal arbeiten Sie?<br><span style="font-size:13px;color:#64748b">Einmalig pro Gerät, später änderbar.</span></p>' +
+        '<div class="ps-kanal-grid">' + tiles + '</div>' +
+      '</div>' +
+    '</div>'
+  );
+  Array.prototype.forEach.call(document.querySelectorAll('[data-kanal]'), function (btn) {
+    btn.onclick = function () {
+      var chosen = btn.getAttribute('data-kanal');
+      __psKanalSet(chosen);
+      __psKanalRoute(chosen, next);
+    };
+  });
+}
+
+// Kleine Zeile unter dem Anmeldeformular: gewählten Kanal anzeigen + ändern
+function __psKanalFooterHtml() {
+  var t = __psKanalTile(__psKanalGet());
+  if (!t) return '';
+  return '<div data-kanal-ui="1" style="margin-top:16px;text-align:center;font-size:12px;color:#64748b">Kanal: <b style="color:' + t.color + '">' + t.label + '</b> · <a href="#" id="ps-kanal-change" style="color:#2563eb;text-decoration:underline">ändern</a></div>';
+}
+
+function __psKanalAttachChange() {
+  var a = document.getElementById('ps-kanal-change');
+  if (!a) return;
+  a.onclick = function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    try { localStorage.removeItem(__PS_KANAL_KEY); } catch (e) {}
+    __psKanalGate(function () { __psRenderAuth('login'); });
+  };
 }
 
 function __psRenderWait(kind) {
@@ -37477,7 +37755,7 @@ function __PS_startAuthGate(startAppFn) {
   }
 
   auth.onAuthStateChanged(function (user) {
-    if (!user) { __psRenderAuth('login'); return; }
+    if (!user) { __psKanalGate(function () { __psRenderAuth('login'); }); return; }
     // SICHERHEITSFIX: Sicherheitsreihenfolge - Domain zuerst prüfen, vor
     // jeder weiteren Prüfung/jedem Firestore-Zugriff.
     if (!/@hetec-gmbh\.de$/i.test(user.email || '')) {
