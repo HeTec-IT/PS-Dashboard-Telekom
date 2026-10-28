@@ -166,12 +166,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.22';
+        manifestLink.href = 'manifest.webmanifest?v=54.23';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.22').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.23').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -897,7 +897,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.22';
+    window.APP_VERSION = '54.23';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -11223,10 +11223,160 @@ const RoamingModal = ({
   const [bruttoPreis, setBruttoPreis] = useState('');
   const [deGb, setDeGb] = useState(''); // optionaler DE-Volumen-Deckel
   const [fuYear, setFuYear] = useState('2026'); // Aufschlag-Jahr (Großhandelspreis)
+  const [prov, setProv] = useState('telekom'); // Anbieter: o2 | telekom | vodafone
 
   if (!isOpen) return null;
-  const ZONES = {
+  const O2_ZONES = {
     eu_roam: {
+      label: 'EU Roaming',
+      flag: '🇪🇺',
+      badge: 'Kostenlos',
+      badgeColor: '#10b981',
+      subtitle: 'Im EU-Ausland unterwegs',
+      headerBg: 'linear-gradient(135deg,#1e3a8a,#1d4ed8,#0369a1)',
+      status: 'ok',
+      statusText: 'Roam like at Home',
+      statusSub: 'Keine Mehrkosten — Tarif gilt wie in Deutschland',
+      countries: ['🇪🇸 Spanien', '🇮🇹 Italien', '🇫🇷 Frankreich', '🇬🇷 Griechenland', '🇵🇹 Portugal', '🇦🇹 Österreich', '🇳🇱 Niederlande', '🇧🇪 Belgien', '🇵🇱 Polen', '🇨🇿 Tschechien', '🇭🇷 Kroatien', '🇭🇺 Ungarn', '🇸🇪 Schweden', '🇩🇰 Dänemark', '🇫🇮 Finnland', '🇮🇪 Irland', '🇸🇰 Slowakei', '🇸🇮 Slowenien', '🇱🇹 Litauen', '🇱🇻 Lettland', '🇪🇪 Estland', '🇲🇹 Malta', '🇨🇾 Zypern', '🇱🇺 Luxemburg', '🇧🇬 Bulgarien', '🇷🇴 Rumänien', '🇺🇦 Ukraine', '🇲🇩 Moldau (ab 2026)'],
+      items: [{
+        icon: '📞',
+        label: 'Telefonieren',
+        detail: 'Unbegrenzt wie zuhause',
+        ok: true
+      }, {
+        icon: '💬',
+        label: 'SMS',
+        detail: 'Im Inklusiv-Paket',
+        ok: true
+      }, {
+        icon: '🌐',
+        label: 'Datenvolumen',
+        detail: 'Inklusiv-GB gelten*',
+        ok: true
+      }, {
+        icon: '⚡',
+        label: 'Speed',
+        detail: 'LTE/5G wo verfügbar',
+        ok: true
+      }, {
+        icon: '📊',
+        label: 'Fair-Use 2026',
+        detail: '(Preis netto ÷ 1,10€) × 2 = EU-GB',
+        ok: null
+      }],
+      tip: ''
+    },
+    de_eu: {
+      label: 'Anruf ins EU-Ausland',
+      flag: '📲',
+      badge: '0,23 €/Min',
+      badgeColor: '#ef4444',
+      subtitle: 'Von Deutschland ins Ausland anrufen',
+      headerBg: 'linear-gradient(135deg,#7c2d12,#dc2626,#b91c1c)',
+      status: 'warn',
+      statusText: 'Kostenpflichtig',
+      statusSub: 'Anrufe aus DE ins EU-Ausland sind Auslandsverbindungen — nicht inklusive, auch nicht mit Allnet-Flat',
+      countries: ['🇪🇸 Spanien', '🇮🇹 Italien', '🇫🇷 Frankreich', '🇬🇷 Griechenland', '🇵🇹 Portugal', '🇦🇹 Österreich'],
+      items: [{
+        icon: '📞',
+        label: 'Anruf DE → EU',
+        detail: 'ca. 0,23 €/Min (EU-Preisgrenze, brutto)',
+        ok: false
+      }, {
+        icon: '💬',
+        label: 'SMS DE → EU',
+        detail: 'bis ca. 0,07 € pro SMS (EU-Preisgrenze, brutto)',
+        ok: false
+      }, {
+        icon: '🌐',
+        label: 'Daten (in DE)',
+        detail: 'Normal inklusive',
+        ok: true
+      }, {
+        icon: '💡',
+        label: 'Tipp: VoIP',
+        detail: 'WhatsApp/FaceTime gratis',
+        ok: true
+      }],
+      tip: 'Tipp für Kunden: WhatsApp, FaceTime oder Signal als kostenlose Alternative empfehlen — läuft über das normale Datenvolumen. Genauer Preis je Tarif/Option: Mein o2 → Tarifdetails.'
+    },
+    world: {
+      label: 'Weltreise (Drittland)',
+      flag: '🌍',
+      badge: 'Achtung: Kosten!',
+      badgeColor: '#f59e0b',
+      subtitle: 'Außerhalb der EU (Weltzone 3 & 4)',
+      headerBg: 'linear-gradient(135deg,#78350f,#d97706,#92400e)',
+      status: 'danger',
+      statusText: 'Hohes Kostenrisiko',
+      statusSub: 'Außerhalb der EU gelten keine Roaming-Schutzregeln',
+      countries: ['🇺🇸 USA', '🇹🇷 Türkei', '🇲🇦 Marokko', '🇹🇭 Thailand', '🇦🇪 Dubai', '🇯🇵 Japan', '🇲🇽 Mexiko', '🇧🇷 Brasilien'],
+      items: [{
+        icon: '📞',
+        label: 'Telefonieren',
+        detail: 'Zone 3: 1,49 €/Min ab · 0,69 € an — Zone 4: 2,49 / 1,59 €',
+        ok: false
+      }, {
+        icon: '💬',
+        label: 'SMS',
+        detail: 'Senden ab 0,39 € · Empfangen kostenlos',
+        ok: false
+      }, {
+        icon: '🌐',
+        label: 'Daten',
+        detail: 'Zone 3: 0,99 €/MB — Zone 4: 1,49 €/MB',
+        ok: false
+      }, {
+        icon: '✅',
+        label: 'Lösung',
+        detail: 'Roaming Plus World: 2 GB für 14,99 € (30 Tage)',
+        ok: true
+      }],
+      tip: 'Unbedingt vor der Reise Roaming Plus World buchen (über 100 Länder, u. a. USA, Türkei, Kanada)! Das Paket enthält nur Daten, Telefonie und SMS laufen zu den Standardpreisen. Kostenbremse: 59,50 € pro Abrechnungszeitraum.'
+    },
+    swiss: {
+      label: 'Schweiz / UK',
+      flag: '🇨🇭',
+      badge: 'Sonderregel',
+      badgeColor: '#8b5cf6',
+      subtitle: 'Nicht-EU (Weltzone 2)',
+      headerBg: 'linear-gradient(135deg,#4c1d95,#7c3aed,#5b21b6)',
+      status: 'warn',
+      statusText: 'Nicht wie EU',
+      statusSub: 'Schweiz = Weltzone 2 (kein EU-Roaming). UK: bis 31.12.2026 wie EU abgerechnet',
+      countries: ['🇨🇭 Schweiz', '🇬🇧 Großbritannien', '🇦🇩 Andorra', '🇬🇮 Gibraltar', '🇮🇲 Isle of Man'],
+      items: [{
+        icon: '📞',
+        label: 'Telefonieren (CH)',
+        detail: '0,54 €/Min abgehend · 0,26 € ankommend',
+        ok: false
+      }, {
+        icon: '💬',
+        label: 'SMS (CH)',
+        detail: 'Senden 0,39 € · Empfangen kostenlos',
+        ok: false
+      }, {
+        icon: '🇨🇭',
+        label: 'Daten (CH)',
+        detail: 'Tagespaket automatisch: 2,99 € für 300 MB',
+        ok: false
+      }, {
+        icon: '🇬🇧',
+        label: 'Großbritannien',
+        detail: 'Bis 31.12.2026 wie EU, danach offen',
+        ok: null
+      }, {
+        icon: '✅',
+        label: 'Lösung',
+        detail: 'Roaming Plus 1 Monat: 9,99 € mit 3 GB, 500 Min., 500 SMS',
+        ok: true
+      }],
+      tip: 'Schweiz-Pendler: Roaming Plus 24 (4,99 €/Monat, 24 Monate Laufzeit). Großbritannien wird laut o2 bis 31.12.2026 wie EU abgerechnet, eine Verlängerung ist nicht garantiert.'
+    }
+  };
+  const TK_ZONES = {
+    eu_roam: {
+      euNote: '+ alle weiteren EU-Mitgliedsstaaten sowie Norwegen, Island und Liechtenstein (EWR). Bei der Telekom zusätzlich: Schweiz und Großbritannien (siehe Szenario „Schweiz / UK“).',
       label: 'EU Roaming',
       flag: '🇪🇺',
       badge: 'Kostenlos',
@@ -11344,6 +11494,7 @@ const RoamingModal = ({
       tip: 'Datenpass vorab reservieren (bis 90 Tage vorher auf pass.telekom.de) — er aktiviert sich bei der Einreise. Auf Schiffen/Flugzeugen kostet der Anruf 2,99 €/Min: Flugmodus oder Bord-WLAN nutzen.'
     },
     swiss: {
+      countriesTitle: 'Wie EU behandelt (Ländergruppe 1)',
       label: 'Schweiz / UK',
       flag: '🇨🇭',
       badge: 'Wie EU',
@@ -11378,7 +11529,190 @@ const RoamingModal = ({
       tip: 'Aktuelle Prepaid-Tarife (seit 21.08.2024) behandeln die Schweiz wie die EU. Bei älteren Prepaid-Tarifen kann mobiles Surfen kostenlos sein, Telefonie und SMS können aber kosten.'
     }
   };
+  const VF_ZONES = {
+    eu_roam: {
+      euNote: '+ alle weiteren EU-Mitgliedsstaaten sowie Norwegen, Island und Liechtenstein (EWR). Großbritannien (inkl. Gibraltar) behandelt Vodafone freiwillig wie die EU.',
+      label: 'EU Roaming',
+      flag: '🇪🇺',
+      badge: 'Kostenlos',
+      badgeColor: '#10b981',
+      subtitle: 'EU, EWR & Großbritannien',
+      headerBg: 'linear-gradient(135deg,#7f1d1d,#dc2626,#991b1b)',
+      status: 'ok',
+      statusText: 'Roam like at Home',
+      statusSub: 'Keine Mehrkosten — Tarif gilt wie in Deutschland',
+      countries: ['🇪🇸 Spanien', '🇮🇹 Italien', '🇫🇷 Frankreich', '🇬🇷 Griechenland', '🇵🇹 Portugal', '🇦🇹 Österreich', '🇳🇱 Niederlande', '🇧🇪 Belgien', '🇵🇱 Polen', '🇨🇿 Tschechien', '🇭🇷 Kroatien', '🇭🇺 Ungarn', '🇸🇪 Schweden', '🇩🇰 Dänemark', '🇫🇮 Finnland', '🇮🇪 Irland', '🇸🇰 Slowakei', '🇸🇮 Slowenien', '🇱🇹 Litauen', '🇱🇻 Lettland', '🇪🇪 Estland', '🇲🇹 Malta', '🇨🇾 Zypern', '🇱🇺 Luxemburg', '🇧🇬 Bulgarien', '🇷🇴 Rumänien', '🇺🇦 Ukraine', '🇲🇩 Moldau (ab 2026)'],
+      items: [{
+        icon: '📞',
+        label: 'Telefonieren & SMS',
+        detail: 'Wie in Deutschland (Standardgespräche, SMS)',
+        ok: true
+      }, {
+        icon: '🌐',
+        label: 'Datenvolumen',
+        detail: 'Begrenzte Tarife: Inlandsvolumen',
+        ok: true
+      }, {
+        icon: '📊',
+        label: 'Unlimited-Tarife',
+        detail: 'Obergrenze: Mobil XL 135 GB · Young XL 107 GB',
+        ok: null
+      }, {
+        icon: '⚠️',
+        label: 'Fair-Use (Dauernutzung)',
+        detail: 'Nach 4 Monaten überwiegend im Ausland: Aufschläge (SMS 2 Wochen vorher)',
+        ok: null
+      }],
+      tip: 'WLAN-Telefonie (WiFi Calling) ist bei Vodafone im Ausland nicht verfügbar. Mailbox vor der Abreise ausschalten (5500 anrufen) — Rufumleitungen können Kosten auslösen.'
+    },
+    de_eu: {
+      label: 'Anruf ins EU-Ausland',
+      flag: '📲',
+      badge: 'Je nach Tarif',
+      badgeColor: '#f59e0b',
+      subtitle: 'Von Deutschland ins Ausland anrufen',
+      headerBg: 'linear-gradient(135deg,#7c2d12,#dc2626,#b91c1c)',
+      status: 'warn',
+      statusText: 'Meist kostenpflichtig',
+      statusSub: 'Anrufe aus Deutschland ins Ausland sind internationale Verbindungen — auch mit Allnet-Flat',
+      countries: ['🇪🇸 Spanien', '🇮🇹 Italien', '🇫🇷 Frankreich', '🇬🇷 Griechenland', '🇵🇹 Portugal', '🇦🇹 Österreich'],
+      items: [{
+        icon: '📞',
+        label: 'Anruf DE → EU',
+        detail: 'Kann extra kosten, auch mit Allnet-Flat',
+        ok: false
+      }, {
+        icon: '✅',
+        label: 'MinutenPakete',
+        detail: 'z. B. ab 2,5 ct/Min in die EU (12 Monate Laufzeit)',
+        ok: true
+      }, {
+        icon: '📲',
+        label: 'Aus dem EU-Ausland nach DE',
+        detail: 'Inlandspreis (zählt als Roaming)',
+        ok: true
+      }, {
+        icon: '💡',
+        label: 'Tipp: VoIP',
+        detail: 'WhatsApp/FaceTime gratis',
+        ok: true
+      }],
+      tip: 'Tipp für Kunden: WhatsApp, FaceTime oder Signal als kostenlose Alternative empfehlen — läuft über das normale Datenvolumen.'
+    },
+    world: {
+      label: 'Weltreise (Drittland)',
+      flag: '🌍',
+      badge: 'Achtung: Kosten!',
+      badgeColor: '#f59e0b',
+      subtitle: 'Außerhalb der EU (Vodafone World)',
+      headerBg: 'linear-gradient(135deg,#78350f,#d97706,#92400e)',
+      status: 'danger',
+      statusText: 'Hohes Kostenrisiko',
+      statusSub: 'Ohne Option gilt automatisch „Vodafone World“ — sehr teuer',
+      countries: ['🇺🇸 USA', '🇹🇷 Türkei', '🇲🇦 Marokko', '🇹🇭 Thailand', '🇦🇪 Dubai', '🇯🇵 Japan', '🇲🇽 Mexiko', '🇧🇷 Brasilien'],
+      items: [{
+        icon: '📞',
+        label: 'Telefonieren',
+        detail: 'Abgehend 1,75 €/Min (Europa 2/USA/Kanada) bis 2,73 €/Min (Welt 1) · ankommend 0,84–1,82 €',
+        ok: false
+      }, {
+        icon: '💬',
+        label: 'SMS',
+        detail: 'Senden 0,49 € · Empfangen kostenlos',
+        ok: false
+      }, {
+        icon: '🌐',
+        label: 'Daten',
+        detail: 'Zone 2 (Türkei/USA/Kanada) ca. 11,88 €/MB · Zone 3 (Thailand/VAE) ca. 19,25 €/MB',
+        ok: false
+      }, {
+        icon: '✅',
+        label: 'Lösung (Urlaub)',
+        detail: 'WorldTravel: 2 GB für 4,99 €/Monat (über 100 Länder, 12 Monate Laufzeit)',
+        ok: true
+      }, {
+        icon: '🎒',
+        label: 'Kurztrip',
+        detail: 'ReisePaket World: 9,99 €/Tag (500 MB, 50 Min., 50 SMS) oder 34,99 €/Woche',
+        ok: true
+      }],
+      tip: 'Kostenschutz: Warnung bei 47,60 €, Sperre bei 59,50 € Daten-Roaming pro Monat (Tagespakete zählen nicht mit). Bordnetze auf Schiffen/Flugzeugen gehören nicht zur EU-Zone — Flugmodus nutzen.'
+    },
+    swiss: {
+      countriesTitle: 'EasyTravel-Zone',
+      label: 'Schweiz / Türkei / USA',
+      flag: '🇨🇭',
+      badge: 'EasyTravel',
+      badgeColor: '#8b5cf6',
+      subtitle: 'Nicht-EU, eigene Reisepakete',
+      headerBg: 'linear-gradient(135deg,#4c1d95,#7c3aed,#5b21b6)',
+      status: 'warn',
+      statusText: 'Nicht wie EU',
+      statusSub: 'Schweiz & Türkei sind nicht im EU-Roaming — EasyTravel oder WorldTravel nötig',
+      countries: ['🇨🇭 Schweiz', '🇹🇷 Türkei', '🇺🇸 USA', '🇨🇦 Kanada', '🇹🇭 Thailand', '🇮🇩 Indonesien', '🇸🇬 Singapur', '🇲🇾 Malaysia', '🇵🇷 Puerto Rico'],
+      items: [{
+        icon: '📅',
+        label: 'EasyTravel Tag',
+        detail: '7,99 €/Tag: Inlandsvolumen, 500 Min./500 SMS (oft automatisch)',
+        ok: null
+      }, {
+        icon: '🗓️',
+        label: 'EasyTravel Woche',
+        detail: '21,99 € für 7 Tage (SMS „Easy7“ an 70127)',
+        ok: true
+      }, {
+        icon: '🔁',
+        label: 'EasyTravel Flat',
+        detail: '6,99 €/Monat (12 Monate) · Flex 9,99 €/Monat (6 Monate)',
+        ok: true
+      }, {
+        icon: '🌐',
+        label: 'Ohne Paket (Schweiz)',
+        detail: 'Daten ca. 4,10 €/MB · Telefonie ab 1,09 €/Min',
+        ok: false
+      }],
+      tip: 'Achtung Tagespaket: Schon ein kurzer Datenzugriff kann 7,99 € auslösen. Mailbox und Rufumleitung vor der Reise deaktivieren (##002#). Thailand, Indonesien, Singapur, Malaysia und Puerto Rico gehören seit 22.07.2026 zur EasyTravel-Zone.'
+    }
+  };
+  const PROV_VOL = {
+    telekom: {
+      title: 'Datenvolumen im Ausland – aktuelle MagentaMobil-Tarife',
+      table: [['Tarif', 'Daten in DE', 'EU / CH / UK', 'Außerhalb EU (LG 2+3)'], ['XS', '20 GB', 'wie in DE', '2 GB / Jahr'], ['S', '30 GB', 'wie in DE', '4 GB / Jahr'], ['M', '50 GB', 'wie in DE', '10 GB / Jahr'], ['L', '100 GB', 'wie in DE', '25 GB / Jahr'], ['XL', 'unbegrenzt', 'Fair-Use ca. 143 GB/Monat', '50 GB / Jahr']],
+      notes: ['EU / Schweiz / UK: Tarife mit begrenztem Volumen nutzen ihr Inklusiv-Volumen wie in Deutschland. Nur bei Unlimited (MagentaMobil XL) gilt eine Fair-Use-Grenze – aktuell ca. 143 GB pro Monat, danach wird auf LTE/5G gedrosselt.', 'Die Grenze legt die Telekom nach der Formel ihrer Auslandspreisliste fest und passt sie bei Bedarf an – aktuellen Wert unter pass.telekom.de prüfen. Der o2-Rechner gilt für die Telekom nicht.', 'Außerhalb der EU (Ländergruppe 2 + 3, z. B. USA, Türkei, Kanada, Thailand): Jahresvolumen pro Kalenderjahr ohne Übertrag, auch für PlusKarten. Danach Datenpass ab 5,95 € (pass.telekom.de). Gilt für neue MagentaMobil-Tarife seit 04.02.2026; Bestandskunden müssen dafür ggf. den Tarif wechseln.', 'Stand: Juni/Juli 2026 (telekom.de, telekom.com, connect.de, teltarif.de). Gilt für Vertragskunden; Prepaid und ältere Tarife können abweichen. Vor der Beratung auf telekom.de gegenprüfen.']
+    },
+    vodafone: {
+      title: 'Datenvolumen im Ausland – Vodafone',
+      table: [['Tarif', 'EU / UK', 'Außerhalb EU'], ['Begrenzte Tarife', 'Inlandsvolumen', 'WorldTravel: 2 GB (4,99 €/Monat)'], ['Mobil XL (unbegrenzt)', 'bis 135 GB/Monat', 'EasyTravel / ReisePaket'], ['Young XL (unbegrenzt)', 'bis 107 GB/Monat', 'EasyTravel / ReisePaket']],
+      notes: ['EU-Volumen laut vodafone.de: Mobil XL 135 GB, Young XL 107 GB. Danach zusätzliches Volumen z. B. über SpeedGo.', 'Fair-Use (4-Monats-Regel): Wer 4 Monate am Stück an mehr Tagen in einem ausländischen EU-Netz als im Vodafone-Netz eingebucht war und es überwiegend dort nutzt, muss mit Aufschlägen rechnen. Vodafone warnt mindestens 2 Wochen vorher per SMS.', 'Kostenschutz weltweit: Warnung bei 47,60 €, Sperre bei 59,50 € pro Monat (Tagespakete zählen nicht mit). Zweite Grenze nach Entsperren: 119 €.', 'Stand: Juli/August 2026 (vodafone.de, teltarif.de). Gilt für Vertragskunden, nicht für CallYa. Vor der Beratung auf vodafone.de gegenprüfen.']
+    }
+  };
+  const PROV_LABEL = { telekom: 'Telekom', vodafone: 'Vodafone', o2: 'o2' };
+  const PROV_ZONES = { o2: O2_ZONES, telekom: TK_ZONES, vodafone: VF_ZONES };
+  const ZONES = PROV_ZONES[prov] || O2_ZONES;
   const z = ZONES[zone];
+  const volPanel = vol => /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3"
+  }, vol.title), /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl border border-slate-200 overflow-hidden mb-4"
+  }, vol.table.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: 'grid',
+      gridTemplateColumns: r.length === 4 ? '0.7fr 1fr 1.5fr 1.4fr' : '1.2fr 1fr 1.4fr',
+      gap: '8px',
+      padding: '9px 12px',
+      fontSize: '12px',
+      fontWeight: i === 0 ? 800 : 600,
+      color: i === 0 ? '#64748b' : '#1e293b',
+      background: i === 0 ? '#f8fafc' : '#fff',
+      borderTop: i === 0 ? 'none' : '1px solid #f1f5f9'
+    }
+  }, r.map((cell, j) => /*#__PURE__*/React.createElement("div", {
+    key: j
+  }, cell))))), vol.notes.map((n, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "mb-2 text-xs text-slate-600 p-3 rounded-xl bg-slate-50 border border-slate-100"
+  }, n)));
   const statusColors = {
     ok: '#10b981',
     warn: '#f59e0b',
@@ -11536,6 +11870,28 @@ const RoamingModal = ({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 px-1"
+  }, "Anbieter"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1 mb-2"
+  }, ['telekom', 'vodafone', 'o2'].map(k => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => {
+      setProv(k);
+      setZone('eu_roam');
+      setTab('info');
+    },
+    style: {
+      flex: 1,
+      padding: '7px 2px',
+      borderRadius: '9px',
+      fontSize: '11px',
+      fontWeight: 800,
+      cursor: 'pointer',
+      border: prov === k ? '1.5px solid #3b82f6' : '1.5px solid #e2e8f0',
+      background: prov === k ? '#eff6ff' : '#fff',
+      color: prov === k ? '#1d4ed8' : '#64748b'
+    }
+  }, PROV_LABEL[k]))), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 px-1"
   }, "Szenario wählen"), Object.entries(ZONES).map(([k, v]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     onClick: () => {
@@ -11584,7 +11940,7 @@ const RoamingModal = ({
       fontWeight: 800,
       color: '#1d4ed8'
     }
-  }, "Fair-Use & Volumen")))), /*#__PURE__*/React.createElement("div", {
+  }, prov === 'o2' ? "EU-GB Rechner" : "Fair-Use & Volumen")))), /*#__PURE__*/React.createElement("div", {
     className: "flex-1 flex flex-col overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-5 pt-4 pb-3 shrink-0"
@@ -11618,7 +11974,7 @@ const RoamingModal = ({
     l: '🌍 Länder'
   }, {
     id: 'fairuse',
-    l: '📊 Fair-Use & Volumen'
+    l: prov === 'o2' ? '📊 Fair-Use Rechner' : '📊 Fair-Use & Volumen'
   }].map(t => /*#__PURE__*/React.createElement("button", {
     key: t.id,
     onClick: () => setTab(t.id),
@@ -11652,36 +12008,378 @@ const RoamingModal = ({
     className: "mt-3 text-xs text-slate-600 p-3 rounded-xl bg-amber-50 border border-amber-100"
   }, "💡 ", z.tip) : null), tab === 'countries' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3"
-  }, zone === 'eu_roam' ? 'EU-Länder (Roam like at Home gilt)' : zone === 'de_eu' ? 'Beispiel-Zielländer' : zone === 'swiss' ? 'Wie EU behandelt (Ländergruppe 1)' : 'Beispiel-Länder außerhalb der EU'), /*#__PURE__*/React.createElement("div", {
+  }, zone === 'eu_roam' ? 'EU-Länder (Roam like at Home gilt)' : zone === 'de_eu' ? 'Beispiel-Zielländer' : zone === 'swiss' ? z.countriesTitle || 'Sonderregel-Länder' : 'Beispiel-Länder außerhalb der EU'), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap"
   }, z.countries.map((c, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     className: "rm-country"
   }, c))), zone === 'eu_roam' && /*#__PURE__*/React.createElement("div", {
     className: "mt-3 text-xs text-slate-500 p-3 rounded-xl bg-slate-50 border border-slate-100"
-  }, "+ alle weiteren EU-Mitgliedsstaaten sowie Norwegen, Island und Liechtenstein (EWR). Bei der Telekom zusätzlich: Schweiz und Großbritannien (siehe Szenario „Schweiz / UK“).")), tab === 'fairuse' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3"
-  }, "Datenvolumen im Ausland – aktuelle MagentaMobil-Tarife"), /*#__PURE__*/React.createElement("div", {
-    className: "rounded-xl border border-slate-200 overflow-hidden mb-4"
-  }, [['Tarif', 'Daten in DE', 'EU / CH / UK', 'Außerhalb EU (LG 2+3)'], ['XS', '20 GB', 'wie in DE', '2 GB / Jahr'], ['S', '30 GB', 'wie in DE', '4 GB / Jahr'], ['M', '50 GB', 'wie in DE', '10 GB / Jahr'], ['L', '100 GB', 'wie in DE', '25 GB / Jahr'], ['XL', 'unbegrenzt', 'Fair-Use ca. 143 GB/Monat', '50 GB / Jahr']].map((r, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '0.7fr 1fr 1.5fr 1.4fr',
-      gap: '8px',
-      padding: '9px 12px',
-      fontSize: '12px',
-      fontWeight: i === 0 ? 800 : 600,
-      color: i === 0 ? '#64748b' : '#1e293b',
-      background: i === 0 ? '#f8fafc' : '#fff',
-      borderTop: i === 0 ? 'none' : '1px solid #f1f5f9'
-    }
-  }, r.map((c, j) => /*#__PURE__*/React.createElement("div", {
-    key: j
-  }, c))))), ['EU / Schweiz / UK: Tarife mit begrenztem Volumen nutzen ihr Inklusiv-Volumen wie in Deutschland. Nur bei Unlimited (MagentaMobil XL) gilt eine Fair-Use-Grenze – aktuell ca. 143 GB pro Monat, danach wird auf LTE/5G gedrosselt.', 'Die Grenze legt die Telekom nach der Formel ihrer Auslandspreisliste fest und passt sie bei Bedarf an – aktuellen Wert unter pass.telekom.de prüfen. Der o2-Rechner gilt für die Telekom nicht.', 'Außerhalb der EU (Ländergruppe 2 + 3, z. B. USA, Türkei, Kanada, Thailand): Jahresvolumen pro Kalenderjahr ohne Übertrag, auch für PlusKarten. Danach Datenpass ab 5,95 € (pass.telekom.de). Gilt für neue MagentaMobil-Tarife seit 04.02.2026; Bestandskunden müssen dafür ggf. den Tarif wechseln.', 'Stand: Juni/Juli 2026 (telekom.de, telekom.com, connect.de, teltarif.de). Gilt für Vertragskunden; Prepaid und ältere Tarife können abweichen. Vor der Beratung auf telekom.de gegenprüfen.'].map((n, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: "mb-2 text-xs text-slate-600 p-3 rounded-xl bg-slate-50 border border-slate-100"
-  }, n))))))));
+  }, z.euNote || "+ alle weiteren 27 EU-Mitgliedsstaaten sowie Norwegen, Island und Liechtenstein (EWR).")), tab === 'fairuse' && (prov === 'o2' ? (() => {
+    // Offizielle Aufschläge pro GB (netto) laut Fair-Use-Policy + EU-Senkungen
+    const GWSP_MAP = {
+      '2022': 2.975,
+      '2023': 1.80,
+      '2024': 1.55,
+      '2025': 1.30,
+      '2026': 1.10
+    };
+    const GWSP = GWSP_MAP[fuYear] || 1.10;
+    const brutto = parseFloat((bruttoPreis || '').replace(',', '.')) || 0;
+    const netto = brutto > 0 ? brutto / 1.19 : 0;
+    const formelGb = netto > 0 ? Math.round(netto / GWSP * 2 * 10) / 10 : 0;
+    // Optionaler DE-Deckel: im Ausland nie mehr als das Tarif-Volumen
+    const deGbNum = parseFloat((deGb || '').replace(',', '.')) || 0;
+    const capped = formelGb > 0 && deGbNum > 0 && formelGb > deGbNum;
+    const euGb = capped ? deGbNum : formelGb;
+    const color = euGb >= 100 ? '#10b981' : euGb >= 50 ? '#f59e0b' : euGb > 0 ? '#3b82f6' : '#e2e8f0';
+    const examples = [{
+      label: 'Telekom',
+      ex: [{
+        p: 19.99,
+        label: 'Magenta S'
+      }, {
+        p: 29.99,
+        label: 'Magenta M'
+      }, {
+        p: 39.99,
+        label: 'Magenta L'
+      }, {
+        p: 54.99,
+        label: 'Magenta XL'
+      }]
+    }, {
+      label: 'o2',
+      ex: [{
+        p: 14.99,
+        label: 'o2 S'
+      }, {
+        p: 24.99,
+        label: 'o2 M'
+      }, {
+        p: 39.99,
+        label: 'o2 L'
+      }, {
+        p: 54.99,
+        label: 'o2 XL'
+      }]
+    }, {
+      label: 'Vodafone',
+      ex: [{
+        p: 19.99,
+        label: 'Smart M'
+      }, {
+        p: 29.99,
+        label: 'Smart L'
+      }, {
+        p: 39.99,
+        label: 'Giga M'
+      }, {
+        p: 54.99,
+        label: 'Giga XL'
+      }]
+    }];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: '580px',
+        margin: '0 auto'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '14px',
+        alignItems: 'stretch',
+        marginBottom: '14px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#475569',
+        display: 'block',
+        marginBottom: '8px'
+      }
+    }, "Monatspreis des Tarifs (brutto)"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'relative'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      step: "0.01",
+      inputMode: "decimal",
+      placeholder: "39,99",
+      value: bruttoPreis,
+      onChange: e => setBruttoPreis(e.target.value),
+      style: {
+        width: '100%',
+        padding: '16px 44px 16px 18px',
+        border: `2px solid ${euGb > 0 ? color : '#3b82f6'}`,
+        borderRadius: '14px',
+        fontSize: '26px',
+        fontWeight: 900,
+        color: '#1e293b',
+        outline: 'none',
+        boxSizing: 'border-box'
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: 'absolute',
+        right: '16px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '18px',
+        fontWeight: 800,
+        color: '#94a3b8'
+      }
+    }, "€"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: '150px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '14px',
+        borderRadius: '14px',
+        background: euGb > 0 ? color + '15' : '#f8fafc',
+        border: `2px solid ${euGb > 0 ? color : '#e2e8f0'}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '40px',
+        fontWeight: 900,
+        color: euGb > 0 ? color : '#cbd5e1',
+        lineHeight: 1
+      }
+    }, euGb > 0 ? `~${euGb}` : '–'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#64748b',
+        marginTop: '6px',
+        textAlign: 'center'
+      }
+    }, "GB im EU-Ausland"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: '12px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#64748b',
+        marginBottom: '6px'
+      }
+    }, "Aufschlag pro GB (netto) — je nach Vertragsjahr:"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5,1fr)',
+        gap: '5px'
+      }
+    }, [['2022', '2,98€'], ['2023', '1,80€'], ['2024', '1,55€'], ['2025', '1,30€'], ['2026', '1,10€']].map(([yr, rate]) => /*#__PURE__*/React.createElement("button", {
+      key: yr,
+      onClick: () => setFuYear(yr),
+      style: {
+        padding: '7px 2px',
+        borderRadius: '8px',
+        border: `1.5px solid ${fuYear === yr ? '#3b82f6' : '#e2e8f0'}`,
+        background: fuYear === yr ? '#eff6ff' : '#f8fafc',
+        cursor: 'pointer',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '12px',
+        fontWeight: 800,
+        color: fuYear === yr ? '#1d4ed8' : '#374151'
+      }
+    }, yr), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '9px',
+        color: fuYear === yr ? '#3b82f6' : '#94a3b8',
+        fontWeight: 600
+      }
+    }, rate))))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: '14px',
+        padding: '12px 14px',
+        borderRadius: '12px',
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0'
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: '12px',
+        fontWeight: 700,
+        color: '#475569',
+        display: 'block',
+        marginBottom: '6px'
+      }
+    }, "GB des Tarifs in Deutschland ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: '#94a3b8'
+      }
+    }, "(optional)")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '10px',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'relative',
+        width: '130px'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      step: "1",
+      inputMode: "numeric",
+      placeholder: "z.B. 50",
+      value: deGb,
+      onChange: e => setDeGb(e.target.value),
+      style: {
+        width: '100%',
+        padding: '9px 36px 9px 12px',
+        border: '1.5px solid #e2e8f0',
+        borderRadius: '9px',
+        fontSize: '15px',
+        fontWeight: 800,
+        color: '#1e293b',
+        outline: 'none',
+        boxSizing: 'border-box'
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: 'absolute',
+        right: '10px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '11px',
+        color: '#94a3b8',
+        fontWeight: 700
+      }
+    }, "GB")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        fontSize: '11px',
+        color: '#64748b',
+        lineHeight: 1.4
+      }
+    }, "Begrenzt das Ergebnis: im Ausland gibt's nie mehr GB als der Tarif überhaupt hat.")), capped && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '8px',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: '#fef3c7',
+        border: '1px solid #fde68a',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#92400e'
+      }
+    }, "📌 Formel ergäbe ", formelGb, " GB — aber Tarif hat nur ", deGbNum, " GB → gedeckelt auf ", deGbNum, " GB"), !capped && formelGb > 0 && deGbNum > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '8px',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: '#dcfce7',
+        border: '1px solid #bbf7d0',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#166534'
+      }
+    }, "✅ ", formelGb, " GB liegen unter dem Tarif-Volumen — voll nutzbar")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#475569',
+        marginBottom: '10px'
+      }
+    }, "Oder Tarif antippen:"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: '10px',
+        marginBottom: '16px'
+      }
+    }, examples.map(prov => /*#__PURE__*/React.createElement("div", {
+      key: prov.label,
+      style: {
+        background: '#f8fafc',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '8px 10px',
+        background: '#f1f5f9',
+        fontWeight: 800,
+        fontSize: '12px',
+        color: '#374151',
+        textAlign: 'center'
+      }
+    }, prov.label), prov.ex.map(e => {
+      const gb = Math.round(e.p / 1.19 / GWSP * 2 * 10) / 10;
+      const active = Math.abs(brutto - e.p) < 0.01;
+      return /*#__PURE__*/React.createElement("div", {
+        key: e.p,
+        onClick: () => setBruttoPreis(e.p.toFixed(2)),
+        style: {
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 10px',
+          cursor: 'pointer',
+          borderBottom: '1px solid #f1f5f9',
+          background: active ? '#eff6ff' : 'transparent'
+        },
+        className: "hover:bg-blue-50"
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '11px',
+          fontWeight: 700,
+          color: '#374151'
+        }
+      }, e.label), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '10px',
+          color: '#94a3b8'
+        }
+      }, e.p.toFixed(2), " €")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '14px',
+          fontWeight: 900,
+          color: '#2563eb'
+        }
+      }, "~", gb));
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '10px 14px',
+        borderRadius: '10px',
+        background: '#eff6ff',
+        border: '1px solid #bfdbfe'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '11px',
+        fontWeight: 800,
+        color: '#1e40af',
+        marginBottom: '3px'
+      }
+    }, "Offizielle Fair-Use-Formel (o2/Telefónica)"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '11px',
+        color: '#1e40af',
+        fontWeight: 600
+      }
+    }, "Monatspreis netto ÷ Aufschlag/GB netto × 2 = EU-GB. Danach Aufschlag ", GWSP.toFixed(2).replace('.', ','), " €/GB netto.")));
+  })() : volPanel(PROV_VOL[prov])))))));
 };
 const SKIP_REASONS = ['Nur Handyfinanzierung', 'Sprachbarrieren', 'Shop Agent keine Lust', 'Zeitdruck / zu wenig Zeit', 'Technischer Fehler / App-Problem', 'Sonstiges (bitte beschreiben)'];
 // ═══════════════════════════════════════════════════════════════════
@@ -30601,7 +31299,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.22"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.23"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
