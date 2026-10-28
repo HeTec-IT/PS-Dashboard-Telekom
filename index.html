@@ -137,12 +137,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.14';
+        manifestLink.href = 'manifest.webmanifest?v=54.15';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.14').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.15').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -538,8 +538,7 @@
             refreshEnd();
             if (pauseBtn) pauseBtn.style.display = 'none';
             if (continueBtn) continueBtn.focus();
-            // Schliessen klappt nur, wenn der Browser es erlaubt (Android meist nicht).
-            try { window.close(); } catch (e) {}
+            // Nicht schliessen: Der Countdown bleibt sichtbar, verlassen wird per Home-Geste.
         }
         // App beenden: alle Eingaben dieser Beratung sofort loeschen und die installierte PWA verlassen.
         // Ein Webskript darf ein Fenster nur per window.close() schliessen, wenn die Session-History
@@ -784,7 +783,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.14';
+    window.APP_VERSION = '54.15';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -30818,7 +30817,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.14"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.15"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
