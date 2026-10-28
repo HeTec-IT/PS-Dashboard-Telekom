@@ -137,12 +137,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.17';
+        manifestLink.href = 'manifest.webmanifest?v=54.18';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.17').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.18').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -468,7 +468,9 @@
                 });
                 return true;
             } catch (_) {
-                nativeBackMode = false;
+                // Kurzzeitiger Fehler (z. B. Dokument gerade nicht aktiv): NICHT auf den History-Guard wechseln.
+                // Ein zusaetzlicher History-Eintrag wuerde window.close() in "App beenden" blockieren.
+                // Der naechste ensureGuard-Tick versucht es erneut.
                 nativeBackWatcher = null;
                 return false;
             }
@@ -479,7 +481,7 @@
             if (document.visibilityState === 'hidden') return;
             var data = hasData();
             if (nativeBackMode) {
-                if (data) { if (!armNativeBack() && !nativeBackMode) ensureGuard(); }
+                if (data) armNativeBack();
                 else disarmNativeBack();
                 return;
             }
@@ -799,7 +801,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.17';
+    window.APP_VERSION = '54.18';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -30833,7 +30835,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.17"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.18"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
