@@ -137,12 +137,12 @@
 
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'manifest.webmanifest?v=54.18';
+        manifestLink.href = 'manifest.webmanifest?v=54.19';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js?v=54.18').catch(function (e) {
+                navigator.serviceWorker.register('sw.js?v=54.19').catch(function (e) {
                     console.warn('SW-Registrierung fehlgeschlagen:', e);
                 });
             });
@@ -358,7 +358,14 @@
         // Chrome auf Android: native Zurueck-Gesten ohne synthetischen History-Eintrag.
         // Dies erlaubt dem Browser, die PWA beim echten System-Zurueck zu verlassen.
         // Andere Browser nutzen weiterhin den bisherigen History-Guard.
-        var nativeBackMode = typeof window.CloseWatcher === 'function' && /Android/i.test(navigator.userAgent || '');
+        // Tablets (z. B. Samsung) senden im Desktop-Modus einen Linux-UA ohne "Android" -> Touch-Geraet mitzaehlen.
+        var nativeBackMode = false;
+        try {
+            var uaStr = navigator.userAgent || '';
+            var touchLinux = /Linux|X11/i.test(uaStr) && !/CrOS|Windows|Macintosh|iPhone|iPad/i.test(uaStr) &&
+                (navigator.maxTouchPoints || 0) > 1 && window.matchMedia('(pointer: coarse)').matches;
+            nativeBackMode = typeof window.CloseWatcher === 'function' && (/Android/i.test(uaStr) || touchLinux);
+        } catch (_) { nativeBackMode = false; }
         var nativeBackWatcher = null;
         var guarded = false;
         var popAttached = false;
@@ -801,7 +808,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '54.18';
+    window.APP_VERSION = '54.19';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -30835,7 +30842,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginLeft: '-8px',
       marginRight: '2px'
     }
-  }, "v54.18"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
+  }, "v54.19"), LINK_EMPLOYEE && !PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowMyStats(true),
     className: "p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors",
     title: "Meine Statistik – Qualität & Vorgänge ansehen"
