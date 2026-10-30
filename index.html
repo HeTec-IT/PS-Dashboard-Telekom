@@ -5339,7 +5339,7 @@ const SHOPS = {
   // Netzbetreiber). Der erste Eintrag ist der Standard-Shop.
   //   label = Anzeigename im Shop-Dropdown
   //   name  = Name auf der Kundenunterlage (Deckblatt)
-  //   theme = Farbe der Kundenunterlage: leer = Telekom-Magenta, 'vodafone' = Rot, 'hetec' = Türkis
+  //   theme = Farbe der Kundenunterlage: leer = Telekom-Magenta, 'vodafone' = Rot, 'hetec' = Türkis, 'o2' = Blau
   //   id    = Shop-Kennung im Archiv-Dateinamen (buildArchivDateiname), z.B.
   //           'fh-ellwangen' -> PENCIL_Fh-Ellwangen_Abschluss_2026-10-30_122.pdf
   // adresse/tel der neuen Standorte bei Bedarf nachtragen.
@@ -5412,7 +5412,8 @@ const SHOPS = {
     ort: 'Backnang',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'o2'
   },
   'fh-waldkraiburg-d1': {
     id: 'fh-waldkraiburg-d1',
@@ -27256,7 +27257,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     // const _TK_MAGENTA = { g1:'#A6216E', g2:'#9C1E67', g3:'#8E1A5E', chip:'#7A1650', qr:'A6216E' };
 
     // Farbvarianten je Shop (SHOPS[...].theme). Ohne theme bleibt es beim Telekom-Magenta.
-    //   vodafone = Vodafone-Rot · hetec = HeTec-Türkis
+    //   vodafone = Vodafone-Rot · hetec = HeTec-Türkis · o2 = o2-Blau
     const _SHOP_SHARE_THEMES = {
       vodafone: {
         g1: '#E60000',
@@ -27264,6 +27265,13 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         g3: '#B80000',
         chip: '#8F0000',
         qr: 'E60000'
+      },
+      o2: {
+        g1: '#1e40af',
+        g2: '#2563eb',
+        g3: '#3b82f6',
+        chip: '#003CA6',
+        qr: '003CA6'
       },
       hetec: {
         g1: '#009AA8',
