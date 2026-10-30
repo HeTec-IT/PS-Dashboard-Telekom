@@ -5335,11 +5335,16 @@ const _qrFor = url => 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&
 // ═══════════════════════════════════════════════════════════════
 const AKTIONSMAPPE_AKTIV = false;
 const SHOPS = {
-  // Dieses Repo ist AUSSCHLIESSLICH der Telekom-Partner-Shop.
-  // Bewusst nur EIN Shop – es gibt hier keine o2-Filialen und
-  // keinen Shop-Wechsler. Weitere Telekom-Shops kommen hier dazu.
+  // Fachhandel: alle Standorte laufen als eine Marke (keine Unterscheidung nach
+  // Netzbetreiber). Der erste Eintrag ist der Standard-Shop.
+  //   label = Anzeigename im Shop-Dropdown
+  //   name  = Name auf der Kundenunterlage (Deckblatt)
+  //   id    = Shop-Kennung im Archiv-Dateinamen (buildArchivDateiname), z.B.
+  //           'fh-ellwangen' -> PENCIL_Fh-Ellwangen_Abschluss_2026-10-30_122.pdf
+  // adresse/tel der neuen Standorte bei Bedarf nachtragen.
   'telekom-crailsheim': {
     id: 'telekom-crailsheim',
+    label: 'Telekom Crailsheim',
     name: 'HeTec Handytarifmakler',
     ort: 'Crailsheim',
     adresse: 'Schillerstraße 6, 74564 Crailsheim',
@@ -5349,24 +5354,125 @@ const SHOPS = {
     // das Google-Profil mit prominentem "Rezension schreiben"-Button.
     reviewUrl: 'https://www.google.com/search?hl=de-DE&gl=de&q=Telekom+Partner+Crailsheim,+Schillerstra%C3%9Fe+6,+74564+Crailsheim&ludocid=16798782424287144657&lsig=AB86z5VtqhztHf9y756Qd_cva-HP#lrd=0x4798f11ab2e0f8cd:0xe921439c72b5ead1,3',
     instagram: 'https://www.instagram.com/telekompartnercrailsheim/'
+  },
+  'fh-ellwangen': {
+    id: 'fh-ellwangen',
+    label: 'FH Ellwangen',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Ellwangen',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'fh-noerdlingen': {
+    id: 'fh-noerdlingen',
+    label: 'FH Nördlingen',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Nördlingen',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'fh-langenau': {
+    id: 'fh-langenau',
+    label: 'FH Langenau',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Langenau',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'fh-simbach': {
+    id: 'fh-simbach',
+    label: 'FH Simbach',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Simbach',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'vodafone-backnang': {
+    id: 'vodafone-backnang',
+    label: 'Vodafone Backnang',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Backnang',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'o2-backnang': {
+    id: 'o2-backnang',
+    label: 'o2 Backnang',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Backnang',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'fh-waldkraiburg-d1': {
+    id: 'fh-waldkraiburg-d1',
+    label: 'FH Waldkraiburg D1',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Waldkraiburg',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
+  },
+  'fh-waldkraiburg-d2': {
+    id: 'fh-waldkraiburg-d2',
+    label: 'FH Waldkraiburg D2',
+    name: 'HeTec Handytarifmakler',
+    ort: 'Waldkraiburg',
+    adresse: '',
+    tel: '',
+    brand: 'telekom'
   }
 };
 // Kurz-Codes für den Gutschein-Präfix (z.B. AAL, CR, SHA). Bei Bedarf
 // hier fest überschreiben; sonst wird ein sinnvoller Code abgeleitet.
 const _SHOP_CODE = {
-  'telekom-crailsheim': 'TCR'
+  'telekom-crailsheim': 'TCR',
+  'fh-ellwangen': 'ELL',
+  'fh-noerdlingen': 'NOE',
+  'fh-langenau': 'LAN',
+  'fh-simbach': 'SIM',
+  'vodafone-backnang': 'VBK',
+  'o2-backnang': 'OBK',
+  'fh-waldkraiburg-d1': 'WD1',
+  'fh-waldkraiburg-d2': 'WD2'
 };
 // Fehlende reviewUrl/qrUrl automatisch aus Name+Adresse (Google-Maps-Suche) füllen
 Object.values(SHOPS).forEach(s => {
-  const q = s.name + ', ' + s.adresse;
+  const q = s.name + ', ' + (s.adresse || s.ort);
   if (!s.reviewUrl) s.reviewUrl = _gmapsSearch(q);
   if (!s.qrUrl) s.qrUrl = s.reviewUrl;
   if (!s.code) s.code = _SHOP_CODE[s.id] || (s.ort || 'XX').replace(/[^A-Za-zÄÖÜäöü]/g, '').slice(0, 3).toUpperCase();
 });
 
-// Nur EIN Shop in diesem Repo – kein ?shop=-Parameter, kein Wechsler.
-// Weitere Telekom-Shops: oben in SHOPS eintragen; der erste ist der Standard.
-const CURRENT_SHOP_ID = Object.keys(SHOPS)[0];
+// Aktiver Shop: Link ?shop=fh-ellwangen (wird gemerkt) > zuletzt gewählter Shop
+// (localStorage 'tps_shop', vom Shop-Dropdown gesetzt) > Standard (erster Eintrag).
+// Unbekannte Werte werden ignoriert.
+const CURRENT_SHOP_ID = (() => {
+  const norm = v => {
+    let s = (v || '').toString().trim().toLowerCase();
+    s = s.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
+    return s.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  };
+  const known = id => !!id && Object.prototype.hasOwnProperty.call(SHOPS, id);
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    const fromLink = norm(params.get('shop') || params.get('filiale') || '');
+    if (known(fromLink)) {
+      try {
+        localStorage.setItem('tps_shop', fromLink);
+      } catch (_) {}
+      return fromLink;
+    }
+    const saved = norm(localStorage.getItem('tps_shop') || '');
+    if (known(saved)) return saved;
+  } catch (e) {}
+  return Object.keys(SHOPS)[0];
+})();
 const CURRENT_SHOP = SHOPS[CURRENT_SHOP_ID];
 try {
   window.__PS_SHOP = CURRENT_SHOP_ID;
@@ -31469,7 +31575,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
   }, Object.keys(SHOPS).map(id => /*#__PURE__*/React.createElement("option", {
     key: id,
     value: id
-  }, SHOPS[id].name)))), view === 'offer' && /*#__PURE__*/React.createElement("div", {
+  }, SHOPS[id].label || SHOPS[id].name)))), view === 'offer' && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
