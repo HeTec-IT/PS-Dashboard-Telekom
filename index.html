@@ -27432,7 +27432,14 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       // Gutschein-Kasten + Visitenkarte des Verkäufers (kein Google-/Instagram-Code mehr).
       // Der Name kommt aus dem Login-Profil (LINK_EMPLOYEE). Die E-Mail erscheint nur, wenn es
       // eine Firmenadresse ist – private Adressen landen nie auf der Kundenunterlage.
-      const _agentName = String(LINK_EMPLOYEE || '').replace(/\s+/g, ' ').trim();
+      // LINK_EMPLOYEE ist beim Seitenstart festgelegt – nach einem frischen Login/Nutzerwechsel
+      // ohne Reload noch leer oder veraltet. Der Login schreibt den Profilnamen aber sofort in
+      // localStorage; deshalb zuerst dort lesen (nur lesend, Login bleibt unverändert).
+      let _agentRaw = '';
+      try {
+        _agentRaw = localStorage.getItem('tps_link_agent') || '';
+      } catch (e) {}
+      const _agentName = String(_agentRaw || LINK_EMPLOYEE || '').replace(/\s+/g, ' ').trim();
       let _agentMail = '';
       try {
         _agentMail = String(window.__betaAuth && window.__betaAuth.currentUser && window.__betaAuth.currentUser.email || '').trim().toLowerCase();
