@@ -24066,6 +24066,7 @@ function App() {
             try {
               clearAutosave();
             } catch (e) {}
+            try { if (window.__psClearActiveSession) window.__psClearActiveSession(); } catch (_) {}
             setTimeout(() => {
               try {
                 window.__psIntentionalReload = true;
@@ -24336,6 +24337,7 @@ function App() {
               try {
                 clearAutosave();
               } catch (e) {}
+              try { if (window.__psClearActiveSession) window.__psClearActiveSession(); } catch (_) {}
               // v53k: Reload erst, wenn der (System-)Teilen-Dialog
               // wirklich zu ist – Windows resolved schon beim Oeffnen.
               nachTeilenAusfuehren(() => {
@@ -30677,6 +30679,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         try {
           clearAutosave();
         } catch (e) {}
+        try { if (window.__psClearActiveSession) window.__psClearActiveSession(); } catch (_) {}
         try {
           window.__psIntentionalReload = true;
           window.location.reload();
