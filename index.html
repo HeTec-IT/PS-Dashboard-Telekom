@@ -5339,6 +5339,7 @@ const SHOPS = {
   // Netzbetreiber). Der erste Eintrag ist der Standard-Shop.
   //   label = Anzeigename im Shop-Dropdown
   //   name  = Name auf der Kundenunterlage (Deckblatt)
+  //   theme = Farbe der Kundenunterlage: leer = Telekom-Magenta, 'vodafone' = Rot, 'hetec' = Türkis
   //   id    = Shop-Kennung im Archiv-Dateinamen (buildArchivDateiname), z.B.
   //           'fh-ellwangen' -> PENCIL_Fh-Ellwangen_Abschluss_2026-10-30_122.pdf
   // adresse/tel der neuen Standorte bei Bedarf nachtragen.
@@ -5362,7 +5363,8 @@ const SHOPS = {
     ort: 'Ellwangen',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'hetec'
   },
   'fh-noerdlingen': {
     id: 'fh-noerdlingen',
@@ -5371,7 +5373,8 @@ const SHOPS = {
     ort: 'Nördlingen',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'hetec'
   },
   'fh-langenau': {
     id: 'fh-langenau',
@@ -5389,7 +5392,8 @@ const SHOPS = {
     ort: 'Simbach',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'hetec'
   },
   'vodafone-backnang': {
     id: 'vodafone-backnang',
@@ -5398,7 +5402,8 @@ const SHOPS = {
     ort: 'Backnang',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'vodafone'
   },
   'o2-backnang': {
     id: 'o2-backnang',
@@ -5425,7 +5430,8 @@ const SHOPS = {
     ort: 'Waldkraiburg',
     adresse: '',
     tel: '',
-    brand: 'telekom'
+    brand: 'telekom',
+    theme: 'vodafone'
   }
 };
 // Kurz-Codes für den Gutschein-Präfix (z.B. AAL, CR, SHA). Bei Bedarf
@@ -27249,7 +27255,25 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     // Zurueckhaltende Alternative (kein Original-Magenta):
     // const _TK_MAGENTA = { g1:'#A6216E', g2:'#9C1E67', g3:'#8E1A5E', chip:'#7A1650', qr:'A6216E' };
 
-    const _SHARE_THEME = CURRENT_BRAND === 'telekom' ? _TK_MAGENTA : {
+    // Farbvarianten je Shop (SHOPS[...].theme). Ohne theme bleibt es beim Telekom-Magenta.
+    //   vodafone = Vodafone-Rot · hetec = HeTec-Türkis
+    const _SHOP_SHARE_THEMES = {
+      vodafone: {
+        g1: '#E60000',
+        g2: '#D10000',
+        g3: '#B80000',
+        chip: '#8F0000',
+        qr: 'E60000'
+      },
+      hetec: {
+        g1: '#009AA8',
+        g2: '#008794',
+        g3: '#00727D',
+        chip: '#005C65',
+        qr: '008794'
+      }
+    };
+    const _SHARE_THEME = CURRENT_BRAND === 'telekom' ? _SHOP_SHARE_THEMES[CURRENT_SHOP.theme] || _TK_MAGENTA : {
       g1: '#1e40af',
       g2: '#2563eb',
       g3: '#3b82f6',
