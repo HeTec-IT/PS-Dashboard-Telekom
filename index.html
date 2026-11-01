@@ -28293,12 +28293,12 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       // ══════════════════════════════════════════════════════════════════
       image: {
         type: 'jpeg',
-        quality: 0.98
+        quality: _archivKurz ? 0.75 : 0.98
       },
       html2canvas: {
         // iOS/iPad: Canvas-Pixel-Limit (~16M px) → hohe scale erzeugt Leerseiten.
         // Daher auf iOS-Geräten scale reduzieren.
-        scale: function () {
+        scale: Math.min(_archivKurz ? 1.5 : 99, function () {
           try {
             var ua = navigator.userAgent || '';
             var isIOS = /iPad|iPhone|iPod/.test(ua) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
@@ -28338,7 +28338,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
           } catch (e) {
             return 2;
           }
-        }(),
+        }()),
         useCORS: true,
         allowTaint: true,
         imageTimeout: 20000,
@@ -28821,7 +28821,8 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         if (blob && window.PDFLib) {
           const _kopieName = textData?.Kundenname || textData?.CustomerName || 'Angebot';
           const _offerObj = buildOfferObject('pdfcopy_' + Date.now().toString(36), _kopieName);
-          const _json = JSON.stringify(_offerObj);
+          // Kommazahlen auf 3 Stellen runden (Stiftdruck/-breite): halbiert die Arbeitskopie, optisch identisch
+          const _json = JSON.stringify(_offerObj, (k, v) => typeof v === 'number' && isFinite(v) && v % 1 !== 0 ? Math.round(v * 1000) / 1000 : v);
           if (_json.length < 4000000) {
             // Schutz: max ~4 MB Arbeitskopie
             const _srcBytes = await blob.arrayBuffer();
