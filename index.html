@@ -28500,6 +28500,13 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
                 div.style.border = 'none';
                 div.style.resize = 'none';
                 div.style.padding = _ownFont ? ta.style.padding : window.getComputedStyle(ta).padding || '8px';
+                // Die globale PDF-Regel setzt font-size/line-height/color/padding mit !important → nur inline-!important gewinnt.
+                if (_ownFont) {
+                  ['font-size', 'line-height', 'font-weight', 'color', 'padding'].forEach(function (prop) {
+                    var val = ta.style.getPropertyValue(prop);
+                    if (val) div.style.setProperty(prop, val, 'important');
+                  });
+                }
                 div.style.margin = '0';
                 div.style.width = '100%';
                 div.style.height = '100%';
