@@ -1,6 +1,6 @@
 // Pencil Selling – Telekom – Service Worker
 // Beim Update NUR diese Versionsnummer hochzählen -> alte Caches werden entfernt.
-const CACHE = "pencil-tcr-v13";
+const CACHE = "pencil-tcr-v14";
 const SHELL = ["./", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
