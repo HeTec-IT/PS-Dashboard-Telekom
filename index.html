@@ -22317,7 +22317,7 @@ function App() {
   // Der Flow holt nur die PDF aus SharePoint (Öffnen) und liefert Verbindungsstatus + Dateiliste für den einmaligen Admin-Import.
   // Gesucht wird im Firestore-Suchindex "pdf_index". Leer = Treffer werden gefunden, lassen sich aber noch nicht öffnen.
   // Nur Adressen https://….api.powerplatform.com/… bzw. https://….logic.azure.com/… werden akzeptiert (Login-Token geht nur dorthin).
-  const PENCIL_ARCHIV_FLOW_URL = '';
+  const PENCIL_ARCHIV_FLOW_URL = 'https://defaultbffb3b9ff04a4553a4bd451341d982.c3.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/c19dac4835d44e8a80ed2d45ddc48801/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=om_TCiK4wXQNlFEJ1_toEQzP8wNRDdNeDGVdpxCyDS8';
   const archivCfg = () => ({
     url: PENCIL_ARCHIV_FLOW_URL,
     allowedIds: PS_GET_ALLOWED_SHOP_IDS(),
