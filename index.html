@@ -34324,7 +34324,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       marginTop: '4px',
       marginBottom: 0
     }
-  }, "Kunden suchen · SharePoint-Ordner öffnen")), /*#__PURE__*/React.createElement("div", {
+  }, "Kunden suchen · Angebote laden")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '18px',
       display: 'flex',
@@ -34380,7 +34380,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       fontSize: '16px',
       color: '#2563eb'
     }
-  }, "→")), /*#__PURE__*/React.createElement("button", {
+  }, "→")), !archivCfg().url && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       window.open(ARCHIV_URL_ABSCHLUESSE, '_blank', 'noopener');
       setShowArchivPopup(false);
@@ -34429,7 +34429,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       fontSize: '16px',
       color: '#10b981'
     }
-  }, "→")), /*#__PURE__*/React.createElement("button", {
+  }, "→")), !archivCfg().url && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       window.open(ARCHIV_URL_ANGEBOTE, '_blank', 'noopener');
       setShowArchivPopup(false);
@@ -34528,7 +34528,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       fontSize: '16px',
       color: '#ca8a04'
     }
-  }, "→")), /*#__PURE__*/React.createElement("button", {
+  }, "→")), !archivCfg().url && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setShowArchivPopup(false);
       openFinalizeModal();
