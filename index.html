@@ -23524,6 +23524,14 @@ function App() {
 
   // ===== SKIP-LIMIT MANAGEMENT (Firestore-basiert) =====
   const getMonthKey = () => new Date().toISOString().slice(0, 7); // "2026-06"
+  const trackToolUsage = async tool => {
+    try {
+      const db = getStatsDb();
+      const agent = window.__PS_PROFILE_NAME || (typeof LINK_EMPLOYEE !== 'undefined' && LINK_EMPLOYEE) || 'Unbekannt';
+      const docId = `${tool}_${agent}_${getMonthKey()}`;
+      await db.collection('tool_usage').doc(docId).set({ agent, tool, month: getMonthKey(), count: firebase.firestore.FieldValue.increment(1), ts: new Date().toISOString() }, { merge: true });
+    } catch (e) { console.error('trackToolUsage:', e); }
+  };
 
   const getSkipCountThisMonth = async agentName => {
     try {
@@ -36436,7 +36444,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
       }
     }, "✓ Übernehmen"));
   })())), document.body), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowWlanModal(true),
+    onClick: () => { try { trackToolUsage('wlanPlaner'); } catch (e) {} setShowWlanModal(true); },
     style: {
       width: '100%',
       display: 'flex',
@@ -36532,7 +36540,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     label: checkedTechs && Object.values(checkedTechs).some(Boolean) ? `Technologie (${Object.values(checkedTechs).filter(Boolean).length} ✓)` : 'Technologie-Check',
     icon: ICONS.Zap,
     active: checkedTechs && Object.values(checkedTechs).some(Boolean),
-    onClick: () => setShowTechModal(true),
+    onClick: () => { try { trackToolUsage('technologieCheck'); } catch (e) {} setShowTechModal(true); },
     accentCol: '#f59e0b'
   }, {
     label: speedRecommendation ? 'Speed ermittelt ✓' : 'Speed-Rechner',
@@ -36650,13 +36658,13 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
     icon: ICONS.Tv,
     accentCol: '#ec4899',
     active: !!tvSnapshot,
-    onClick: () => setShowTvModal(true)
+    onClick: () => { try { trackToolUsage('tvKalkulation'); } catch (e) {} setShowTvModal(true); }
   }, {
     label: 'Roaming Check',
     icon: ICONS.Globe,
     accentCol: '#8b5cf6',
     active: false,
-    onClick: () => setShowRoamingModal(true)
+    onClick: () => { try { trackToolUsage('roamingCheck'); } catch (e) {} setShowRoamingModal(true); }
   }].map(btn => /*#__PURE__*/React.createElement("button", {
     key: btn.label,
     onClick: btn.onClick,
