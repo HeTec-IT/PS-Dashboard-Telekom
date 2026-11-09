@@ -975,7 +975,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '57.1';
+    window.APP_VERSION = '57.2';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -8757,7 +8757,7 @@ const PREIS_STUFE_TPL = {
   es: ['MENSUAL, MESES {r} (€)', 'MENSUAL DESDE EL MES {b} (€)'],
   tr: ['AYLIK, {r}. AYLAR (€)', 'AYLIK, {b}. AYDAN İTİBAREN (€)']
 };
-const PREIS_AB_SCHNELL = [4, 7, 13, 19];
+const PREIS_AB_SCHNELL = [4, 6, 13, 19];
 const MOCK_TRANSLATIONS = {
   ru: {
     Offer1Title: '1. Устройства, провайдер и использование',
@@ -35556,7 +35556,12 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
         sp.textContent = txt;
         d.appendChild(sp);
         inp.replaceWith(d);
-        let fs = Math.min(parseFloat(inp.style.fontSize) || 32, 26);
+        let fs = 11.5; // Notiz = gleiche Groesse wie der Fliesstext der Kachel
+        try {
+          const _ref = (area.previousElementSibling && area.previousElementSibling.querySelector && area.previousElementSibling.querySelector('.sit-answer-sent')) || stage.querySelector('.sit-answer-sent');
+          const _rf = _ref ? parseFloat(getComputedStyle(_ref).fontSize) : 0;
+          if (_rf > 0) fs = _rf;
+        } catch (e) {}
         sp.style.fontSize = fs + 'px';
         while (fs > 9 && (sp.offsetHeight > (H || 0) - 2 || sp.scrollWidth > (W || 0) - 24)) {
           fs -= 1;
