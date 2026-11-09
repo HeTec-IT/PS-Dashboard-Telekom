@@ -975,7 +975,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '57.4';
+    window.APP_VERSION = '57.5';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -46359,7 +46359,7 @@ input::placeholder,textarea::placeholder{color:transparent!important;opacity:0!i
   }, /*#__PURE__*/React.createElement(Icon, {
     d: ICONS.ArrowLeft,
     size: 14
-  }), " Zurück"), (PS_IS_ADMIN() || CURRENT_SHOP_ID !== 'schwaebisch-hall') && /*#__PURE__*/React.createElement("button", {
+  }), " Zurück"), PS_IS_ADMIN() && /*#__PURE__*/React.createElement("button", {
     onClick: handleQuickPdf,
     "data-ps-quick-pdf": "1",
     title: "PDF sofort erstellen",
