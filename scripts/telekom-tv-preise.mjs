@@ -22,6 +22,7 @@ const GRENZEN = { smart: [5, 20], stream: [8, 35], mega: [15, 60] };
 export function preiseAusText(text) {
   const t = String(text || '').replace(/(\d)\s+,(\d{2})/g, '$1,$2');
   const preise = {};
+  const monate = {};
   for (const [id, name] of TARIFE) {
     const re = new RegExp('MAGENTA\\s?TV\\s+' + name + '(?![A-Za-z])', 'gi');
     let m;
@@ -30,10 +31,17 @@ export function preiseAusText(text) {
       const rest = t.slice(start, start + 700);
       const naechster = rest.search(/MAGENTA\s?TV/i);
       const abschnitt = naechster >= 0 ? rest.slice(0, naechster) : rest;
-      const p = /ab dem 7\.?\s*Monat\s+(\d{1,2}(?:,\d{2})?)\s*€/i.exec(abschnitt);
-      if (p) preise[id] = zahl(p[1]);
+      // Vorteilspreis: erste Monate 0 €, dann der Normalpreis. Gilt der Preis, der zur HOECHSTEN Monatsangabe gehoert ("ab dem 7. Monat 30 €").
+      const re2 = /ab dem (\d{1,2})\.?\s*Monat\s+(\d{1,2}(?:,\d{2})?)\s*€/gi;
+      let best = null, q;
+      while ((q = re2.exec(abschnitt))) { const n = parseInt(q[1], 10); if (!best || n > best.n) best = { n, preis: q[2] }; }
+      if (best && best.n >= 2 && best.n <= 13) {
+        preise[id] = zahl(best.preis);
+        monate[id] = best.n - 1; // Gratis-/Vorteilsmonate vor dem Normalpreis
+      }
     }
   }
+  Object.defineProperty(preise, 'vorteilMonate', { value: monate, enumerable: false });
   return preise;
 }
 
@@ -96,6 +104,13 @@ async function main() {
   for (const k of ['smart', 'stream', 'mega']) {
     if (neu.preise[k] !== treffer.p[k]) geaendert = true;
     neu.preise[k] = treffer.p[k];
+  }
+  // Vorteilsmonate (Gratis-Phase) nur uebernehmen, wenn alle drei Tarife dasselbe zeigen
+  const vm = treffer.p.vorteilMonate || {};
+  const werte = ['smart', 'stream', 'mega'].map(k => vm[k]);
+  if (werte.every(v => typeof v === 'number' && v === werte[0])) {
+    if (typeof neu.vorteilMonate === 'number' && neu.vorteilMonate !== werte[0]) geaendert = true;
+    neu.vorteilMonate = werte[0];
   }
   neu.quelle = treffer.quelle;
   neu.geprueft = heute();
