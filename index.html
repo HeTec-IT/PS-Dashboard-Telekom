@@ -975,7 +975,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '57.3';
+    window.APP_VERSION = '57.4';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -7674,7 +7674,7 @@ function SitChipsPanel({ sel, onToggle, onNote, custom, ink, cost }) {
   return h('div', { className: 'sit-chips-panel custom-scrollbar' }, SIT_CHIP_BLOCKS.map(b => h('div', { key: b.title, className: 'sit-chip-block ' + (b.cat || '') }, h('div', { className: 'sit-chip-title' }, h('i', null, h(Icon, { d: b.icon, size: 15 })), sitT(b.title)), b.groups.map(gid => {
     const g = SIT_CHIP_GROUPS.find(x => x.id === gid);
     const cur = sel[g.id] || [];
-    return h('div', { key: g.id }, g.id === 'port' ? null : h('div', { className: 'sit-chip-label' }, sitT(g.label)), g.id === 'port' ? null : h('div', { className: 'sit-chip-row' }, g.opts.map(o => h('button', {
+    return h('div', { key: g.id }, h('div', { className: 'sit-chip-label' }, sitT(g.label)), h('div', { className: 'sit-chip-row' }, g.opts.map(o => h('button', {
       key: o[0],
       type: 'button',
       className: 'sit-chip' + (g.id === 'anb' ? ' p ' + (SIT_BRAND[o[0]] || '') : '') + (cur.includes(o[0]) ? ' on' : ''),
