@@ -975,7 +975,7 @@
          Bei neuer Version: APP_VERSION unten hochsetzen. Fertig.
          ══════════════════════════════════════════════════════════════════════ -->
     <script>
-    window.APP_VERSION = '57.5';
+    window.APP_VERSION = '57.6';
     (function(){
         try {
             var KEY = 'pencil_app_version';
@@ -18762,6 +18762,300 @@ const PinLockModal = ({
     }
   }, "Abbrechen")))));
 };
+// ═════════════════════════════════════════════════════════════════
+// ARCHIV-PROTOKOLL (Meine Statistik → Archiv): eigene Archivierungen der letzten 30 Tage.
+//   Quellen: Suchindex "pdf_index" (Eintrag nach Uebergabe an den Archiv-Flow, uid = Mitarbeiter),
+//            lokal wartende Eintraege (kein Netz), geparkte Vorgaenge, lokal protokollierte Uebergabe-Fehler.
+//   Ablage-Pruefung: Flow "PDF Archiv API V3", Aktion  exists  { names:[...] } → { ok:true, found:[...] }  (SharePoint).
+//     - gefunden                      → "Archivierung erfolgreich"
+//     - nicht gefunden, < 20 Minuten  → "Wird abgelegt …"
+//     - nicht gefunden, >= 20 Minuten → "Archivierung fehlgeschlagen"
+//     - Pruefung nicht moeglich (Flow kennt die Aktion noch nicht) → "erfolgreich" mit Hinweis "Ablage nicht geprueft"
+// ═════════════════════════════════════════════════════════════════
+const PS_ARCHFAIL_KEY = 'ps_archfail_v1';
+const PS_ARCHOK_KEY = 'ps_archverified_v1';
+const PS_ARCH_ABLAGE_MIN = 20;
+const PS_ARCH_EXISTS_AKTIV = false; // Telekom: erst nach Flow-Update (Aktion exists) auf true
+const psArchFailGet = () => {
+  try {
+    const a = JSON.parse(localStorage.getItem(PS_ARCHFAIL_KEY) || '[]');
+    const alt = Date.now() - 30 * 86400000;
+    return Array.isArray(a) ? a.filter(x => x && x.fileName && (x.ts || 0) > alt) : [];
+  } catch (e) {
+    return [];
+  }
+};
+const psArchFailLog = (fileName, betreff, err) => {
+  try {
+    const f = String(betreff || '').split('|');
+    let ctx = null;
+    try {
+      const c = window.__psIdxCtx;
+      if (c && c.dateiname === fileName) ctx = c;
+    } catch (e) {}
+    const a = psArchFailGet().filter(x => psIdxId(x.fileName) !== psIdxId(fileName));
+    a.push({
+      fileName: String(fileName || '').slice(0, 180),
+      typ: f[1] === 'abschluss' ? 'abschluss' : 'angebot',
+      kunde: String(ctx && ctx.kunde || '').slice(0, 80),
+      ruf: String(ctx && ctx.ruf || (() => { try { return psArchParseFile(fileName, []).phone; } catch (e) { return ''; } })() || '').slice(0, 24),
+      shopId: String(window.__PS_SHOP_ORT || window.__PS_SHOP || '').toLowerCase().slice(0, 40),
+      ts: Date.now(),
+      uid: String(window.__PS_USER_UID || ''),
+      reason: String(err && err.message || err || '').slice(0, 120)
+    });
+    localStorage.setItem(PS_ARCHFAIL_KEY, JSON.stringify(a.slice(-100)));
+  } catch (e) {}
+};
+const psArchOkGet = () => {
+  try {
+    const o = JSON.parse(localStorage.getItem(PS_ARCHOK_KEY) || '{}');
+    const alt = Date.now() - 31 * 86400000;
+    const r = {};
+    Object.keys(o || {}).forEach(k => { if ((o[k] || 0) > alt) r[k] = o[k]; });
+    return r;
+  } catch (e) {
+    return {};
+  }
+};
+const psArchOkSet = o => {
+  try { localStorage.setItem(PS_ARCHOK_KEY, JSON.stringify(o)); } catch (e) {}
+};
+// Fragt den Flow, welche Dateien wirklich in SharePoint liegen. available=false → Flow kann es (noch) nicht.
+const psArchVerify = async (cfg, names) => {
+  const found = new Set();
+  if (!PS_ARCH_EXISTS_AKTIV || !cfg || !cfg.url || !names.length) return { available: false, found };
+  try {
+    for (let i = 0; i < names.length; i += 40) {
+      const res = await psArchRequest(cfg, { action: 'exists', names: names.slice(i, i + 40) }, 30000);
+      if (!res || res.ok !== true || !Array.isArray(res.found)) return { available: false, found };
+      res.found.forEach(n => found.add(psIdxId(n)));
+    }
+    return { available: true, found };
+  } catch (e) {
+    return { available: false, found };
+  }
+};
+// 4 Kalenderwochen (Mo–So): diese Woche + 3 davor
+const psArchWeekStart = (ts, back) => {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7 * (back || 0));
+  return d.getTime();
+};
+const psArchWeeksStart = now => psArchWeekStart(now, 3);
+const psArchIsoWeek = ms => {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const w1 = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d.getTime() - w1.getTime()) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+};
+const ArchivProtokollView = ({ heute, onAlle } = {}) => {
+  const h = React.createElement;
+  const [st, setSt] = React.useState({ loading: true, rows: [], error: '', verifyAvailable: false });
+  const [openWeeks, setOpenWeeks] = React.useState({}); // Standard: alle Wochen eingeklappt
+  const load = React.useCallback(async () => {
+    setSt(x => ({ ...x, loading: true }));
+    const now = Date.now();
+    const since = psArchWeeksStart(now);
+    const uid = String(window.__PS_USER_UID || '').trim();
+    let items = [], error = '';
+    const cfg = (window.__psArchCfgGetter && window.__psArchCfgGetter()) || {};
+    try {
+      const db = psIdxDb();
+      if (!db || !uid) throw new Error('no-db');
+      if (psArchOffline()) throw new Error('offline');
+      const shops = cfg.isAdmin ? [''] : (cfg.allowedIds || []).slice();
+      const rs = await Promise.allSettled(shops.map(shop => {
+        let q = db.collection(PS_IDX_COLL);
+        if (shop) q = q.where('shopId', '==', shop);
+        return q.where('uid', '==', uid).limit(300).get();
+      }));
+      const map = new Map();
+      let ok = 0;
+      rs.forEach(r => {
+        if (r.status !== 'fulfilled') return;
+        ok++;
+        r.value.forEach(d => {
+          const x = d.data();
+          if (x && x.fileName && x.src === 'app' && String(x.uid || '') === uid && (x.ts || 0) >= since) map.set(d.id, x);
+        });
+      });
+      if (!ok && shops.length) error = 'Archiv-Protokoll konnte nicht geladen werden (Verbindung oder Berechtigung).';
+      items = Array.from(map.values());
+    } catch (e) {
+      error = 'Archiv-Protokoll konnte nicht geladen werden (kein Internet?).';
+    }
+    const ids = new Set(items.map(x => psIdxId(x.fileName)));
+    let queued = [], parked = [];
+    try {
+      queued = psIdxQueueGet().filter(x => String(x.uid || '') === uid && (x.ts || 0) >= since && !ids.has(psIdxId(x.fileName)));
+    } catch (e) {}
+    try {
+      parked = (await listParkedArchive() || []).filter(x => (x.ts || 0) >= since && String(x.uid || '') === uid);
+    } catch (e) {}
+    // Ablage in SharePoint pruefen (nur fuer noch nicht bestaetigte Dateien)
+    const okMap = psArchOkGet();
+    const toCheck = items.filter(x => !okMap[psIdxId(x.fileName)]);
+    let verifyAvailable = false;
+    if (toCheck.length && !error) {
+      const v = await psArchVerify(cfg, toCheck.map(x => x.fileName));
+      verifyAvailable = v.available;
+      if (v.available) {
+        toCheck.forEach(x => { if (v.found.has(psIdxId(x.fileName))) okMap[psIdxId(x.fileName)] = now; });
+        psArchOkSet(okMap);
+      }
+    } else if (!toCheck.length && items.length) {
+      verifyAvailable = true; // alles bereits frueher bestaetigt
+    }
+    const rows = [];
+    items.forEach(e => {
+      const id = psIdxId(e.fileName);
+      let status;
+      if (okMap[id]) status = 'ok';
+      else if (verifyAvailable) status = now - (e.ts || 0) < PS_ARCH_ABLAGE_MIN * 60000 ? 'wait' : 'fail';
+      else status = 'ok_unchecked';
+      rows.push({ key: 'i' + e.fileName, e, status });
+    });
+    queued.forEach(e => rows.push({ key: 'q' + e.fileName, e, status: 'wait_net' }));
+    parked.forEach(e => rows.push({ key: 'p' + e.id, e, status: 'parked' }));
+    psArchFailGet().filter(x => String(x.uid || '') === uid && (x.ts || 0) >= since && !ids.has(psIdxId(x.fileName)) && !okMap[psIdxId(x.fileName)]).forEach(e => rows.push({ key: 'f' + e.fileName, e, status: 'fail_send' }));
+    rows.sort((a, b) => (b.e.ts || 0) - (a.e.ts || 0));
+    setSt({ loading: false, rows, error, verifyAvailable });
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+  const fmt = ts => {
+    try { return new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+  };
+  const shopName = id => (typeof SHOPS !== 'undefined' && SHOPS && SHOPS[id] && SHOPS[id].name) || id || '';
+  const INFO = {
+    ok: { icon: '\u2705', text: 'Archivierung erfolgreich', sub: 'in SharePoint abgelegt', color: '#15803d' },
+    ok_unchecked: { icon: '\u2705', text: 'Archivierung erfolgreich', sub: 'gesendet \u00B7 Ablage nicht gepr\u00FCft', color: '#15803d' },
+    wait: { icon: '\u23F3', text: 'Wird abgelegt \u2026', sub: 'wird noch in SharePoint abgelegt', color: '#b45309' },
+    wait_net: { icon: '\u23F3', text: 'Wartet auf Verbindung', sub: 'wird automatisch nachgesendet', color: '#b45309' },
+    parked: { icon: '\u23F3', text: 'Geparkt', sub: 'noch nicht gesendet \u2013 unter \u201EGeparkte Vorg\u00E4nge\u201C nachtragen', color: '#b45309' },
+    fail: { icon: '\u274C', text: 'Archivierung fehlgeschlagen', sub: 'nicht in SharePoint gefunden \u2013 bitte erneut archivieren', color: '#dc2626' },
+    fail_send: { icon: '\u274C', text: 'Archivierung fehlgeschlagen', sub: 'nicht gesendet \u2013 bitte erneut archivieren', color: '#dc2626' }
+  };
+  const row = r => {
+    const e = r.e, I = INFO[r.status];
+    const isAbs = e.typ === 'abschluss' || e.type === 'abschluss';
+    // Abschluss: die Nummer (Handy / Festnetz / MSID / Subscription-ID) ist die Kennung, der Kundenname nur Zusatz
+    const titel = isAbs ? (e.ruf || e.kunde || '\u2013') : (e.kunde || e.ruf || '\u2013');
+    const zusatz = isAbs ? (e.ruf && e.kunde ? e.kunde : '') : (e.kunde && e.ruf ? e.ruf : '');
+    return h('div', {
+      key: r.key,
+      style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderBottom: '1px solid #f1f5f9', background: r.status.indexOf('fail') === 0 ? '#fef2f2' : '#fff' }
+    }, h('div', { style: { fontSize: '18px', width: '24px', textAlign: 'center' } }, I.icon),
+    h('div', { style: { flex: 1, minWidth: 0 } },
+      h('div', { style: { fontSize: '13px', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+        (isAbs ? 'Abschluss' : 'Angebot') + ' \u00B7 ' + titel),
+      h('div', { style: { fontSize: '11px', color: '#64748b' } }, fmt(e.ts) + (e.shopId ? ' \u00B7 ' + shopName(e.shopId) : '') + (zusatz ? ' \u00B7 ' + zusatz : ''))),
+    h('div', { style: { textAlign: 'right', maxWidth: '45%' } },
+      h('div', { style: { fontSize: '12px', fontWeight: 800, color: I.color } }, I.text),
+      h('div', { style: { fontSize: '10.5px', color: '#94a3b8' } }, I.sub)));
+  };
+  const weeks = (() => {
+    const fm = ms => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const start = psArchWeekStart(Date.now(), i);
+      const endD = new Date(start); endD.setDate(endD.getDate() + 7);
+      const end = endD.getTime();
+      out.push({
+        key: 'w' + start,
+        title: i === 0 ? 'Diese Woche' : i === 1 ? 'Letzte Woche' : 'KW ' + psArchIsoWeek(start),
+        range: fm(start) + ' \u2013 ' + fm(end - 1),
+        rows: st.rows.filter(r => (r.e.ts || 0) >= start && (r.e.ts || 0) < end)
+      });
+    }
+    return out;
+  })();
+  const cnt = f => st.rows.filter(r => f(r.status)).length;
+  const nOk = cnt(x => x === 'ok' || x === 'ok_unchecked'), nFail = cnt(x => x.indexOf('fail') === 0), nWait = cnt(x => x === 'wait' || x === 'wait_net' || x === 'parked');
+  if (heute) {
+    // Überblick: was habe ich HEUTE archiviert (Name, Art, Uhrzeit, Status)
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const hr = st.rows.filter(r => (r.e.ts || 0) >= d0.getTime());
+    const zeit = ts => { try { return new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+    const KURZ = { ok: 'abgelegt', ok_unchecked: 'gesendet', wait: 'wird abgelegt \u2026', wait_net: 'wartet auf Verbindung', parked: 'geparkt', fail: 'fehlgeschlagen', fail_send: 'fehlgeschlagen' };
+    const MAXH = 5;
+    const zeile = (r, i, arr) => {
+      const e = r.e, I = INFO[r.status];
+      const isAbs = e.typ === 'abschluss' || e.type === 'abschluss';
+      const name = e.kunde || e.ruf || '\u2013';
+      return h('div', { key: r.key, style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 0', borderBottom: i < arr.length - 1 ? '1px solid #f1f5f9' : 'none' } },
+        h('div', { style: { fontSize: '15px', width: '22px', textAlign: 'center', flexShrink: 0 } }, I.icon),
+        h('div', { style: { flex: 1, minWidth: 0 } },
+          h('div', { style: { fontSize: '13px', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, name),
+          h('div', { style: { fontSize: '11px', color: '#64748b' } }, (isAbs ? 'Abschluss' : 'Angebot') + ' \u00B7 ' + zeit(e.ts) + (e.kunde && e.ruf ? ' \u00B7 ' + e.ruf : ''))),
+        h('div', { style: { fontSize: '11px', fontWeight: 800, color: I.color, whiteSpace: 'nowrap' } }, KURZ[r.status] || I.text));
+    };
+    return h('div', { style: { background: '#fff', borderRadius: '14px', border: '1px solid ' + (hr.some(r => r.status.indexOf('fail') === 0) ? '#fecaca' : '#e2e8f0'), padding: '13px 16px' } },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } },
+        h('div', { style: { fontSize: '13px', fontWeight: 900, color: '#0f172a' } }, 'Heute archiviert'),
+        !st.loading && h('div', { style: { fontSize: '11px', fontWeight: 700, color: '#64748b' } }, hr.length + (hr.length === 1 ? ' Pencil Selling' : ' Pencil Sellings')),
+        h('button', { type: 'button', onClick: load, title: 'Aktualisieren', 'aria-label': 'Aktualisieren', style: { marginLeft: 'auto', padding: '5px 9px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, background: '#fff', color: '#1e3a8a', border: '1px solid #cbd5e1', cursor: 'pointer' } }, '\u21BB'),
+        typeof onAlle === 'function' && h('button', { type: 'button', onClick: onAlle, style: { padding: '5px 11px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, background: '#fff', color: '#1e3a8a', border: '1px solid #cbd5e1', cursor: 'pointer' } }, 'Alle im Archiv \u203A')),
+      st.error && h('div', { style: { fontSize: '11px', fontWeight: 700, color: '#b45309', padding: '4px 0' } }, '\u26A0\uFE0F ' + st.error),
+      st.loading ? h('div', { style: { padding: '10px 0', color: '#94a3b8', fontSize: '12px', fontWeight: 600 } }, 'Lade \u2026')
+        : hr.length === 0 ? (st.error ? null : h('div', { style: { padding: '8px 0 2px', color: '#94a3b8', fontSize: '12px', fontWeight: 600 } }, 'Heute noch nichts archiviert.'))
+        : h('div', null, hr.slice(0, MAXH).map(zeile),
+            hr.length > MAXH && h('div', { style: { fontSize: '11px', fontWeight: 700, color: '#64748b', paddingTop: '6px' } }, '+' + (hr.length - MAXH) + ' weitere \u00B7 unter \u201EAlle im Archiv\u201C')));
+  }
+  const chip = (txt, c, bg, bd) => h('div', { style: { fontSize: '11px', fontWeight: 800, color: c, background: bg, border: '1px solid ' + bd, borderRadius: '8px', padding: '3px 8px' } }, txt);
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+      h('div', { style: { fontSize: '13px', fontWeight: 900, color: '#0f172a' } }, 'Meine Archivierungen \u00B7 letzte 4 Wochen'),
+      chip('\u2705 ' + nOk + ' erfolgreich', '#15803d', '#f0fdf4', '#bbf7d0'),
+      nFail > 0 && chip('\u274C ' + nFail + ' fehlgeschlagen', '#dc2626', '#fef2f2', '#fecaca'),
+      nWait > 0 && chip('\u23F3 ' + nWait + ' offen', '#b45309', '#fffbeb', '#fde68a'),
+      h('button', { onClick: load, style: { marginLeft: 'auto', padding: '5px 11px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, background: '#fff', color: '#1e3a8a', border: '1px solid #cbd5e1', cursor: 'pointer' } }, '\u21BB Aktualisieren')),
+    st.error && h('div', { style: { fontSize: '12px', fontWeight: 700, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '8px 12px' } }, '\u26A0\uFE0F ' + st.error),
+    st.loading ? h('div', { style: { padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 600 } }, '\u23F3 Lade Archiv-Protokoll\u2026')
+      : (st.rows.length === 0 && !st.error) ? h('div', { style: { padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 600, background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0' } }, '\uD83D\uDCED Noch keine Archivierungen in den letzten 4 Wochen')
+      : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, weeks.map(w => {
+        const isOpen = !!openWeeks[w.key] && w.rows.length > 0;
+        const cc = f => w.rows.filter(r => f(r.status)).length;
+        const wOk = cc(x => x === 'ok' || x === 'ok_unchecked'), wFail = cc(x => x.indexOf('fail') === 0), wWait = cc(x => x === 'wait' || x === 'wait_net' || x === 'parked');
+        const mini = (txt, c) => h('span', { style: { fontSize: '11px', fontWeight: 800, color: c } }, txt);
+        return h('div', { key: w.key, style: { background: '#fff', borderRadius: '14px', border: '1px solid ' + (wFail ? '#fecaca' : '#e2e8f0'), overflow: 'hidden' } },
+          h('button', {
+            type: 'button', 'aria-expanded': isOpen,
+            onClick: () => { if (w.rows.length) setOpenWeeks(o => ({ ...o, [w.key]: !o[w.key] })); },
+            style: { width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: wFail ? '#fef2f2' : '#f8fafc', border: 'none', borderBottom: isOpen ? '1px solid #e2e8f0' : 'none', cursor: w.rows.length ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit' }
+          }, h('span', { style: { fontSize: '12px', color: '#64748b', width: '14px', opacity: w.rows.length ? 1 : 0.3 } }, isOpen ? '\u25BC' : '\u25B6'),
+          h('div', { style: { flex: 1, minWidth: 0 } },
+            h('div', { style: { fontSize: '13px', fontWeight: 900, color: '#0f172a' } }, w.title),
+            h('div', { style: { fontSize: '11px', color: '#64748b' } }, w.range)),
+          w.rows.length === 0 ? h('span', { style: { fontSize: '11px', color: '#94a3b8', fontWeight: 600 } }, 'keine')
+            : h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+              wOk > 0 && mini('\u2705 ' + wOk, '#15803d'),
+              wFail > 0 && mini('\u274C ' + wFail, '#dc2626'),
+              wWait > 0 && mini('\u23F3 ' + wWait, '#b45309'))),
+          isOpen && h('div', null, w.rows.map(row)));
+      })),
+    h('div', { style: { fontSize: '10.5px', color: '#94a3b8', lineHeight: 1.5 } }, st.verifyAvailable ? '\u201EErfolgreich\u201C = Datei wurde in SharePoint gefunden. Dauert die Ablage l\u00E4nger als ' + PS_ARCH_ABLAGE_MIN + ' Minuten, gilt sie als fehlgeschlagen. Angezeigt werden die letzten 4 Wochen.' : '\u201EErfolgreich\u201C = vom Archiv-Ablauf angenommen (die Ablage in SharePoint wird noch nicht gepr\u00FCft). Angezeigt werden die letzten 4 Wochen.'));
+};
+
+// ═════════════════════════════════════════════════════════════════
+// STATISTIK VEREINFACHT: Einklapp-Schalter. Inhalt bleibt vollständig erhalten,
+// ist nur standardmäßig eingeklappt. Zustand wird pro Gerät gemerkt.
+// ═════════════════════════════════════════════════════════════════
+const PsStatsMehr = ({ id, auf, zu, children }) => {
+  const h = React.createElement;
+  const KEY = 'ps_stats_mehr_' + id;
+  const [open, setOpen] = React.useState(() => { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } });
+  const toggle = () => setOpen(o => { const n = !o; try { localStorage.setItem(KEY, n ? '1' : '0'); } catch (e) {} return n; });
+  return h(React.Fragment, null,
+    h('button', {
+      type: 'button', 'aria-expanded': open, onClick: toggle,
+      style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '11px 14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#1e3a8a', fontSize: '12px', fontWeight: 800, cursor: 'pointer', textAlign: 'left' }
+    }, h('span', null, open ? zu : auf), h('span', { style: { fontSize: '11px', color: '#64748b' } }, open ? '\u25B2' : '\u25BC')),
+    open ? React.Children.toArray(children) : null);
+};
+
 const StatsModal = ({
   isOpen,
   onClose,
@@ -18778,7 +19072,7 @@ const StatsModal = ({
   const [fbLoading, setFbLoading] = useState(false);
   const [fbError, setFbError] = useState('');
   const [selectedAgent, setSelectedAgent] = useState(employeeMode ? lockedAgent || '__all__' : '__all__');
-  const [activeTab, setActiveTab] = useState(employeeMode ? 'coaching' : 'uebersicht');
+  const [activeTab, setActiveTab] = useState('uebersicht');
   const [skipAgentsData, setSkipAgentsData] = useState({}); // { agentName: {count, limit} }
   const [range, setRange] = useState('31');
   const [rangeFrom, setRangeFrom] = useState('');
@@ -19434,7 +19728,7 @@ const StatsModal = ({
       padding: '3px',
       gap: '2px'
     }
-  }, TAB('uebersicht', 'Übersicht', '📈'), TAB('entwicklung', 'Entwicklung', '📅'), TAB('coaching', 'Coaching', '🎯'), TAB('vorgaenge', 'Vorgänge', '📋'), isDiegoAdmin && TAB('skip-management', 'Skip-Limits', '⏭'))), /*#__PURE__*/React.createElement("div", {
+  }, TAB('uebersicht', 'Überblick', '📈'), TAB('coaching', 'Coaching', '🎯'), TAB('vorgaenge', 'Archiv und Vorgänge', '🗂️'), isDiegoAdmin && TAB('skip-management', 'Skip-Limits', '⏭'))), /*#__PURE__*/React.createElement("div", {
     className: "custom-scrollbar",
     style: {
       overflowY: 'auto',
@@ -19452,84 +19746,7 @@ const StatsModal = ({
       fontSize: '14px',
       fontWeight: 600
     }
-  }, "⏳ Firebase Daten werden geladen..."), !fbLoading && /*#__PURE__*/React.createElement(React.Fragment, null, activeTab === 'uebersicht' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3,1fr)',
-      gap: '8px'
-    }
-  }, [{
-    label: 'Vorgänge',
-    value: total,
-    color: '#2563eb',
-    bg: '#eff6ff',
-    border: '#bfdbfe',
-    icon: '📋'
-  }, {
-    label: 'Anfragen',
-    value: totalAnfrage,
-    color: '#0891b2',
-    bg: '#ecfeff',
-    border: '#a5f3fc',
-    icon: '🔍'
-  }, {
-    label: 'Angebote',
-    value: totalAngebot,
-    color: '#7c3aed',
-    bg: '#f5f3ff',
-    border: '#ddd6fe',
-    icon: '📄'
-  }, {
-    label: 'Abschlüsse',
-    value: totalAbschluss,
-    color: '#059669',
-    bg: '#ecfdf5',
-    border: '#a7f3d0',
-    icon: '✅'
-  }, {
-    label: 'Abgebrochen',
-    value: totalAbgebr,
-    color: '#d97706',
-    bg: '#fffbeb',
-    border: '#fde68a',
-    icon: '⏹'
-  }, {
-    label: 'Abschluss-Quote',
-    value: `${convRate}%`,
-    color: convRate >= 30 ? '#059669' : convRate >= 15 ? '#d97706' : '#dc2626',
-    bg: convRate >= 30 ? '#ecfdf5' : convRate >= 15 ? '#fffbeb' : '#fef2f2',
-    border: convRate >= 30 ? '#a7f3d0' : convRate >= 15 ? '#fde68a' : '#fecaca',
-    icon: '🎯'
-  }].map(k => /*#__PURE__*/React.createElement("div", {
-    key: k.label,
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      padding: '13px 12px',
-      border: `1.5px solid ${k.border}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '17px',
-      marginBottom: '5px'
-    }
-  }, k.icon), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '22px',
-      fontWeight: 900,
-      color: k.color,
-      lineHeight: 1
-    }
-  }, k.value), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '9px',
-      fontWeight: 700,
-      color: '#94a3b8',
-      textTransform: 'uppercase',
-      letterSpacing: '0.06em',
-      marginTop: '4px'
-    }
-  }, k.label)))), /*#__PURE__*/React.createElement("div", {
+  }, "⏳ Firebase Daten werden geladen..."), !fbLoading && /*#__PURE__*/React.createElement(React.Fragment, null, activeTab === 'uebersicht' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ArchivProtokollView, { heute: true, onAlle: () => setActiveTab('vorgaenge') }), React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
@@ -19634,6 +19851,215 @@ const StatsModal = ({
       marginTop: '4px'
     }
   }, skipped, " von ", total, " Pencil Sellings"))), (() => {
+    // Trichter: ersetzt die 6 Einzelkacheln (Vorgänge, Anfragen, Angebote, Abschlüsse, Abgebrochen, Quote)
+    const h = React.createElement;
+    const seg = [{ l: 'Abschlüsse', v: totalAbschluss, c: '#1e3a8a' }, { l: 'Angebote', v: totalAngebot, c: '#3b82f6' }, { l: 'Anfragen', v: totalAnfrage, c: '#93c5fd' }, { l: 'Abgebrochen', v: totalAbgebr, c: '#cbd5e1' }];
+    const rest = Math.max(0, total - seg.reduce((s, x) => s + x.v, 0));
+    if (rest > 0) seg.push({ l: 'Sonstige', v: rest, c: '#e2e8f0' });
+    const lab = { fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' };
+    const big = { fontSize: '30px', fontWeight: 900, color: '#0f172a', lineHeight: 1.1 };
+    return h('div', { style: { background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '14px 16px' } },
+      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' } },
+        h('div', null, h('div', { style: lab }, 'Vorgänge'), h('div', { style: big }, total)),
+        h('div', { style: { textAlign: 'right' } }, h('div', { style: lab }, 'Abschluss-Quote'), h('div', { style: { ...big, color: convRate >= 30 ? '#059669' : convRate >= 15 ? '#d97706' : '#dc2626' } }, convRate + '%'))),
+      h('div', { style: { display: 'flex', gap: '2px', height: '18px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9' } },
+        total > 0 ? seg.filter(x => x.v > 0).map(x => h('div', { key: x.l, title: x.l + ': ' + x.v, style: { width: x.v / total * 100 + '%', background: x.c } })) : null),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(104px,1fr))', gap: '8px 10px', marginTop: '12px' } },
+        seg.map(x => h('div', { key: x.l, style: { minWidth: 0 } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' } }, h('span', { style: { width: '10px', height: '10px', borderRadius: '3px', background: x.c, flexShrink: 0 } }), x.l),
+          h('div', { style: { fontSize: '18px', fontWeight: 900, color: '#0f172a' } }, x.v)))));
+  })(), React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: '14px',
+      border: '1px solid #e2e8f0',
+      padding: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      marginBottom: '14px'
+    }
+  }, "📋 Pencil Sellings pro Monat"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '6px',
+      height: '80px'
+    }
+  }, trend6m.map(m => {
+    const h = trendMax ? Math.max(4, Math.round(m.total / trendMax * 76)) : 4;
+    const ah = m.total ? Math.round(m.abschluss / m.total * h) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.key,
+      style: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '3px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '9px',
+        fontWeight: 800,
+        color: m.total > 0 ? '#2563eb' : '#cbd5e1'
+      }
+    }, m.total || ''), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '100%',
+        borderRadius: '5px 5px 0 0',
+        background: m.total > 0 ? '#bfdbfe' : '#f1f5f9',
+        height: `${h}px`,
+        position: 'relative',
+        overflow: 'hidden'
+      }
+    }, ah > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: '#059669',
+        height: `${ah}px`
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '9px',
+        color: '#94a3b8',
+        fontWeight: 600,
+        whiteSpace: 'nowrap'
+      }
+    }, m.label));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '14px',
+      marginTop: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '2px',
+      background: '#bfdbfe'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '10px',
+      color: '#64748b',
+      fontWeight: 600
+    }
+  }, "Vorgänge")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '2px',
+      background: '#059669'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '10px',
+      color: '#64748b',
+      fontWeight: 600
+    }
+  }, "Abschlüsse")))), React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: '14px',
+      border: '1px solid #e2e8f0',
+      padding: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      marginBottom: '12px'
+    }
+  }, "📈 Qualität & Übersprungen pro Monat"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px'
+    }
+  }, trend6m.map(m => {
+    const qR = m.total ? Math.round(m.qPassed / m.total * 100) : 0;
+    const sR = m.total ? Math.round(m.skipped / m.total * 100) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.key,
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '52px 1fr 1fr',
+        gap: '10px',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#475569'
+      }
+    }, m.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px'
+      }
+    }, BAR(qR, qR >= 75 ? '#059669' : qR >= 50 ? '#d97706' : '#dc2626'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '10px',
+        fontWeight: 800,
+        color: qR >= 75 ? '#059669' : qR >= 50 ? '#d97706' : '#dc2626',
+        width: '32px',
+        textAlign: 'right'
+      }
+    }, m.total ? qR + '%' : '–'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '9px',
+        color: '#94a3b8',
+        width: '28px'
+      }
+    }, "Qual.")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px'
+      }
+    }, BAR(sR, sR > 20 ? '#dc2626' : sR > 10 ? '#d97706' : '#94a3b8'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '10px',
+        fontWeight: 800,
+        color: sR > 20 ? '#dc2626' : sR > 10 ? '#d97706' : '#64748b',
+        width: '32px',
+        textAlign: 'right'
+      }
+    }, m.total ? sR + '%' : '–'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '9px',
+        color: '#94a3b8',
+        width: '28px'
+      }
+    }, "Skip")));
+  }))), /*#__PURE__*/React.createElement(PsStatsMehr, { id: 'uebersicht', auf: 'Mehr anzeigen \u00B7 Papier und Digital, DSL-Anbieter', zu: 'Weniger anzeigen' }, (() => {
     const counters = getOutputCounters();
     const PAGES = 7;
     // Aktueller Monat + Gesamt
@@ -19805,393 +20231,7 @@ const StatsModal = ({
         textAlign: 'center'
       }
     }, "Schätzung: 7 Seiten/Angebot · echte Druckerseiten nicht messbar (OS-Dialog)"));
-  })()), activeTab === 'entwicklung' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      border: '1px solid #e2e8f0',
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      marginBottom: '14px'
-    }
-  }, "📋 Pencil Sellings pro Monat"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'flex-end',
-      gap: '6px',
-      height: '80px'
-    }
-  }, trend6m.map(m => {
-    const h = trendMax ? Math.max(4, Math.round(m.total / trendMax * 76)) : 4;
-    const ah = m.total ? Math.round(m.abschluss / m.total * h) : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: m.key,
-      style: {
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '3px'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '9px',
-        fontWeight: 800,
-        color: m.total > 0 ? '#2563eb' : '#cbd5e1'
-      }
-    }, m.total || ''), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '100%',
-        borderRadius: '5px 5px 0 0',
-        background: m.total > 0 ? '#bfdbfe' : '#f1f5f9',
-        height: `${h}px`,
-        position: 'relative',
-        overflow: 'hidden'
-      }
-    }, ah > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: '#059669',
-        height: `${ah}px`
-      }
-    })), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '9px',
-        color: '#94a3b8',
-        fontWeight: 600,
-        whiteSpace: 'nowrap'
-      }
-    }, m.label));
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: '14px',
-      marginTop: '8px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '5px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '2px',
-      background: '#bfdbfe'
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '10px',
-      color: '#64748b',
-      fontWeight: 600
-    }
-  }, "Vorgänge")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '5px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '2px',
-      background: '#059669'
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '10px',
-      color: '#64748b',
-      fontWeight: 600
-    }
-  }, "Abschlüsse")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      border: '1px solid #e2e8f0',
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      marginBottom: '12px'
-    }
-  }, "📈 Qualität & Übersprungen pro Monat"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px'
-    }
-  }, trend6m.map(m => {
-    const qR = m.total ? Math.round(m.qPassed / m.total * 100) : 0;
-    const sR = m.total ? Math.round(m.skipped / m.total * 100) : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: m.key,
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '52px 1fr 1fr',
-        gap: '10px',
-        alignItems: 'center'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '11px',
-        fontWeight: 700,
-        color: '#475569'
-      }
-    }, m.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px'
-      }
-    }, BAR(qR, qR >= 75 ? '#059669' : qR >= 50 ? '#d97706' : '#dc2626'), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '10px',
-        fontWeight: 800,
-        color: qR >= 75 ? '#059669' : qR >= 50 ? '#d97706' : '#dc2626',
-        width: '32px',
-        textAlign: 'right'
-      }
-    }, m.total ? qR + '%' : '–'), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '9px',
-        color: '#94a3b8',
-        width: '28px'
-      }
-    }, "Qual.")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px'
-      }
-    }, BAR(sR, sR > 20 ? '#dc2626' : sR > 10 ? '#d97706' : '#94a3b8'), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '10px',
-        fontWeight: 800,
-        color: sR > 20 ? '#dc2626' : sR > 10 ? '#d97706' : '#64748b',
-        width: '32px',
-        textAlign: 'right'
-      }
-    }, m.total ? sR + '%' : '–'), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '9px',
-        color: '#94a3b8',
-        width: '28px'
-      }
-    }, "Skip")));
-  })))), activeTab === 'coaching' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      border: '1px solid #e2e8f0',
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      marginBottom: '12px'
-    }
-  }, "🔍 Ist-Analyse – wie oft abgefragt"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '7px'
-    }
-  }, IST_KEYS.map(({
-    key,
-    label
-  }) => {
-    const count = filtered.filter(r => {
-      const v = (r.canvasStats || {})[key];
-      return v && v.used;
-    }).length;
-    const pct = total ? Math.round(count / total * 100) : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: key,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '130px',
-        fontSize: '12px',
-        fontWeight: 600,
-        color: '#475569',
-        flexShrink: 0
-      }
-    }, label), BAR(pct, '#3b82f6'), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '36px',
-        textAlign: 'right',
-        fontSize: '12px',
-        fontWeight: 800,
-        color: '#1e293b',
-        flexShrink: 0
-      }
-    }, count, "×"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '34px',
-        textAlign: 'right',
-        fontSize: '11px',
-        fontWeight: 700,
-        color: '#94a3b8',
-        flexShrink: 0
-      }
-    }, pct, "%"));
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      border: '1px solid #e2e8f0',
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      marginBottom: '12px'
-    }
-  }, "📄 Angebote – wie oft präsentiert"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '7px'
-    }
-  }, OFFER_KEYS.map(({
-    key,
-    label
-  }) => {
-    const count = filtered.filter(r => {
-      const v = (r.canvasStats || {})[key];
-      return v && v.used;
-    }).length;
-    const pct = total ? Math.round(count / total * 100) : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: key,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '200px',
-        fontSize: '12px',
-        fontWeight: 600,
-        color: '#475569',
-        flexShrink: 0
-      }
-    }, label), BAR(pct, '#7c3aed'), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '36px',
-        textAlign: 'right',
-        fontSize: '12px',
-        fontWeight: 800,
-        color: '#1e293b',
-        flexShrink: 0
-      }
-    }, count, "×"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '34px',
-        textAlign: 'right',
-        fontSize: '11px',
-        fontWeight: 700,
-        color: '#94a3b8',
-        flexShrink: 0
-      }
-    }, pct, "%"));
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#fff',
-      borderRadius: '14px',
-      border: '1px solid #e2e8f0',
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      marginBottom: '12px'
-    }
-  }, "💰 Kostenübersicht – wie oft Preise eingetragen"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '7px'
-    }
-  }, COST_KEYS.map(({
-    key,
-    label
-  }) => {
-    const count = filtered.filter(r => {
-      const v = (r.canvasStats || {})[key];
-      return v && v.used;
-    }).length;
-    const pct = total ? Math.round(count / total * 100) : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: key,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '200px',
-        fontSize: '12px',
-        fontWeight: 600,
-        color: '#475569',
-        flexShrink: 0
-      }
-    }, label), BAR(pct, '#059669'), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '36px',
-        textAlign: 'right',
-        fontSize: '12px',
-        fontWeight: 800,
-        color: '#1e293b',
-        flexShrink: 0
-      }
-    }, count, "×"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '34px',
-        textAlign: 'right',
-        fontSize: '11px',
-        fontWeight: 700,
-        color: '#94a3b8',
-        flexShrink: 0
-      }
-    }, pct, "%"));
-  }))), /*#__PURE__*/React.createElement("div", {
+  })(), React.createElement("div", {
     style: {
       background: '#fff',
       borderRadius: '14px',
@@ -20294,7 +20334,217 @@ const StatsModal = ({
       color: '#94a3b8',
       textAlign: 'center'
     }
-  }, "Sobald neue Beratungen abgeschlossen werden, erscheint hier die Verteilung.")), /*#__PURE__*/React.createElement("div", {
+  }, "Sobald neue Beratungen abgeschlossen werden, erscheint hier die Verteilung.")))), activeTab === 'coaching' && /*#__PURE__*/React.createElement(React.Fragment, null, total > 0 && (() => {
+    // Coaching auf einen Blick: die 3 am seltensten abgefragten Felder der Ist-Analyse
+    const h = React.createElement;
+    const list = IST_KEYS.map(({ key, label }) => {
+      const count = filtered.filter(r => { const v = (r.canvasStats || {})[key]; return v && v.used; }).length;
+      return { key, label, count, pct: Math.round(count / total * 100) };
+    }).sort((a, b) => a.pct - b.pct).slice(0, 3);
+    return h('div', { style: { background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '14px 16px' } },
+      h('div', { style: { fontSize: '13px', fontWeight: 900, color: '#0f172a' } }, employeeMode ? 'Hier fragst du am seltensten' : 'Am seltensten abgefragt'),
+      h('div', { style: { fontSize: '11px', color: '#64748b', marginBottom: '12px' } }, 'Die 3 schwächsten Felder der Ist-Analyse'),
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } }, list.map(x => h('div', { key: x.key, style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        h('div', { style: { width: '120px', fontSize: '12px', fontWeight: 700, color: '#0f172a', flexShrink: 0 } }, x.label),
+        BAR(x.pct, x.pct >= 75 ? '#3b82f6' : '#d97706'),
+        h('div', { style: { width: '34px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#94a3b8' } }, x.count + '\u00D7'),
+        h('div', { style: { width: '40px', textAlign: 'right', fontSize: '13px', fontWeight: 900, color: '#0f172a' } }, x.pct + '%')))));
+  })(), /*#__PURE__*/React.createElement(PsStatsMehr, { id: 'coaching', auf: 'Alle Felder anzeigen \u00B7 Ist-Analyse, Angebote, Kosten, Qualität, Skip-Gründe', zu: 'Weniger anzeigen' }, React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: '14px',
+      border: '1px solid #e2e8f0',
+      padding: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      marginBottom: '12px'
+    }
+  }, "🔍 Ist-Analyse – wie oft abgefragt"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '7px'
+    }
+  }, IST_KEYS.map(({
+    key,
+    label
+  }) => {
+    const count = filtered.filter(r => {
+      const v = (r.canvasStats || {})[key];
+      return v && v.used;
+    }).length;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '130px',
+        fontSize: '12px',
+        fontWeight: 600,
+        color: '#475569',
+        flexShrink: 0
+      }
+    }, label), BAR(pct, '#3b82f6'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '36px',
+        textAlign: 'right',
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#1e293b',
+        flexShrink: 0
+      }
+    }, count, "×"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '34px',
+        textAlign: 'right',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#94a3b8',
+        flexShrink: 0
+      }
+    }, pct, "%"));
+  }))), React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: '14px',
+      border: '1px solid #e2e8f0',
+      padding: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      marginBottom: '12px'
+    }
+  }, "📄 Angebote – wie oft präsentiert"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '7px'
+    }
+  }, OFFER_KEYS.map(({
+    key,
+    label
+  }) => {
+    const count = filtered.filter(r => {
+      const v = (r.canvasStats || {})[key];
+      return v && v.used;
+    }).length;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '200px',
+        fontSize: '12px',
+        fontWeight: 600,
+        color: '#475569',
+        flexShrink: 0
+      }
+    }, label), BAR(pct, '#7c3aed'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '36px',
+        textAlign: 'right',
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#1e293b',
+        flexShrink: 0
+      }
+    }, count, "×"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '34px',
+        textAlign: 'right',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#94a3b8',
+        flexShrink: 0
+      }
+    }, pct, "%"));
+  }))), React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: '14px',
+      border: '1px solid #e2e8f0',
+      padding: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      marginBottom: '12px'
+    }
+  }, "💰 Kostenübersicht – wie oft Preise eingetragen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '7px'
+    }
+  }, COST_KEYS.map(({
+    key,
+    label
+  }) => {
+    const count = filtered.filter(r => {
+      const v = (r.canvasStats || {})[key];
+      return v && v.used;
+    }).length;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '200px',
+        fontSize: '12px',
+        fontWeight: 600,
+        color: '#475569',
+        flexShrink: 0
+      }
+    }, label), BAR(pct, '#059669'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '36px',
+        textAlign: 'right',
+        fontSize: '12px',
+        fontWeight: 800,
+        color: '#1e293b',
+        flexShrink: 0
+      }
+    }, count, "×"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '34px',
+        textAlign: 'right',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#94a3b8',
+        flexShrink: 0
+      }
+    }, pct, "%"));
+  }))), React.createElement("div", {
     style: {
       background: '#fff',
       borderRadius: '14px',
@@ -20484,7 +20734,7 @@ const StatsModal = ({
         fontStyle: 'italic'
       }
     }, "Nur getippte Gründe werden erfasst. Handschriftliche Gründe sind nicht auswertbar."));
-  })(), total === 0 && /*#__PURE__*/React.createElement("div", {
+  })()), total === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '40px',
       textAlign: 'center',
@@ -20495,7 +20745,7 @@ const StatsModal = ({
       borderRadius: '14px',
       border: '1px solid #e2e8f0'
     }
-  }, "📭 Keine Daten im gewählten Zeitraum")), activeTab === 'vorgaenge' && (filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "📭 Keine Daten im gewählten Zeitraum")), activeTab === 'vorgaenge' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ArchivProtokollView, null), filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '40px',
       textAlign: 'center',
